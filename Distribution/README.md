@@ -1,4 +1,4 @@
-# Wallpaper distribution
+# WallSync distribution
 
 This project is prepared for outside-the-Mac-App-Store distribution with:
 
@@ -63,7 +63,7 @@ ZIP for notarization:
 Notarize:
 
 ```bash
-NOTARY_PROFILE="wallpaper-notary" ./Scripts/notarize.sh dist/notarization/Wallpaper.zip
+NOTARY_PROFILE="wallpaper-notary" ./Scripts/notarize.sh dist/notarization/WallSync.zip
 ```
 
 Create DMG:
@@ -75,7 +75,7 @@ SIGNING_CERTIFICATE="Developer ID Application" ./Scripts/create_dmg.sh
 Verify:
 
 ```bash
-./Scripts/verify_gatekeeper.sh dist/export/Wallpaper.app
+./Scripts/verify_gatekeeper.sh dist/export/WallSync.app
 ```
 
 ## Notes
@@ -83,4 +83,5 @@ Verify:
 - The scripts expect a real Apple Team ID via `DEVELOPMENT_TEAM`.
 - `notarytool` is the current Apple-recommended notarization path for custom workflows.
 - The release script staples the app after the ZIP notarization and staples the DMG after the DMG notarization so both offline install and offline first-launch have a safer path.
+- The generated installer now defaults to `dist/release/WallSync.dmg`, mounts as `WallSync`, and exposes `WallSync.app` to the user.
 - If you add new Swift files to the project, regenerate the project file with `./Scripts/generate_project.rb`.

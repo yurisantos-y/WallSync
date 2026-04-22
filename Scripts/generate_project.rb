@@ -16,7 +16,7 @@ test_target = project.new_target(:unit_test_bundle, "WallpaperTests", :osx, "14.
     config.build_settings["MACOSX_DEPLOYMENT_TARGET"] = "14.0"
     config.build_settings["CLANG_ENABLE_MODULES"] = "YES"
     config.build_settings["CODE_SIGN_STYLE"] = "Automatic"
-    config.build_settings["PRODUCT_NAME"] = "$(TARGET_NAME)"
+    config.build_settings["PRODUCT_NAME"] = target == app_target ? "WallSync" : "$(TARGET_NAME)"
   end
 end
 
@@ -33,7 +33,7 @@ end
 test_target.build_configurations.each do |config|
   config.build_settings["PRODUCT_BUNDLE_IDENTIFIER"] = "com.yurisantos.wallpaper.tests"
   config.build_settings["GENERATE_INFOPLIST_FILE"] = "YES"
-  config.build_settings["TEST_HOST"] = "$(BUILT_PRODUCTS_DIR)/Wallpaper.app/Contents/MacOS/Wallpaper"
+  config.build_settings["TEST_HOST"] = "$(BUILT_PRODUCTS_DIR)/WallSync.app/Contents/MacOS/WallSync"
   config.build_settings["BUNDLE_LOADER"] = "$(TEST_HOST)"
 end
 

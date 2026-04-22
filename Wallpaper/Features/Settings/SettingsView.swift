@@ -125,12 +125,20 @@ struct WallpaperSidebar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            VStack(alignment: .leading, spacing: 6) {
-                Label("Wallpaper", systemImage: "sparkles.rectangle.stack.fill")
-                    .font(.title2.weight(.semibold))
-                Text("Um painel mais nativo do macOS para biblioteca, displays e energia.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            HStack(alignment: .top, spacing: 14) {
+                Image("BrandLogo")
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 44, height: 44)
+                    .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 6)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("WallSync")
+                        .font(.title2.weight(.semibold))
+                    Text("Um painel mais nativo do macOS para biblioteca, displays e energia.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 18)

@@ -81,7 +81,7 @@
 		0208A47054A67DD9432ECC9C /* EnergyPolicyController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = EnergyPolicyController.swift; path = Wallpaper/Core/Policies/EnergyPolicyController.swift; sourceTree = "<group>"; };
 		05AB68F626883E7CAE525DFE /* DisplayProviding.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DisplayProviding.swift; path = Wallpaper/Core/Protocols/DisplayProviding.swift; sourceTree = "<group>"; };
 		0F0D6DC6B668CB1167900BA8 /* PermissionStoring.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PermissionStoring.swift; path = Wallpaper/Core/Protocols/PermissionStoring.swift; sourceTree = "<group>"; };
-		10CA118DC1954CD752C6A6AE /* Wallpaper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Wallpaper.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		10CA118DC1954CD752C6A6AE /* WallSync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WallSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		10F8DB41B0C8F6E0AE90C1FD /* WallpaperTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WallpaperTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		146420A48A1824080F224545 /* GeneralSettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = GeneralSettingsView.swift; path = Wallpaper/Features/Settings/GeneralSettingsView.swift; sourceTree = "<group>"; };
 		1ABAD29E7A468F354FE7C838 /* DesktopWallpaperWindowController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DesktopWallpaperWindowController.swift; path = Wallpaper/Infrastructure/AppKit/DesktopWallpaperWindowController.swift; sourceTree = "<group>"; };
@@ -234,7 +234,7 @@
 		5571385506D05FBED4E36870 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				10CA118DC1954CD752C6A6AE /* Wallpaper.app */,
+				10CA118DC1954CD752C6A6AE /* WallSync.app */,
 				10F8DB41B0C8F6E0AE90C1FD /* WallpaperTests.xctest */,
 			);
 			name = Products;
@@ -449,8 +449,8 @@
 			dependencies = (
 			);
 			name = Wallpaper;
-			productName = Wallpaper;
-			productReference = 10CA118DC1954CD752C6A6AE /* Wallpaper.app */;
+			productName = WallSync;
+			productReference = 10CA118DC1954CD752C6A6AE /* WallSync.app */;
 			productType = "com.apple.product-type.application";
 		};
 		E0C91852D8F95A677C18D6CE /* WallpaperTests */ = {
@@ -615,7 +615,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yurisantos.wallpaper;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = WallSync;
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -676,7 +676,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = WallSync;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -717,7 +717,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wallpaper.app/Contents/MacOS/Wallpaper";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WallSync.app/Contents/MacOS/WallSync";
 			};
 			name = Debug;
 		};
@@ -787,7 +787,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 6.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Wallpaper.app/Contents/MacOS/Wallpaper";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/WallSync.app/Contents/MacOS/WallSync";
 			};
 			name = Release;
 		};

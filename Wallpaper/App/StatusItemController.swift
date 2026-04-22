@@ -12,13 +12,14 @@ final class StatusItemController: NSObject {
         guard statusItem == nil else { return }
 
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.image = NSImage(systemSymbolName: "play.rectangle.on.rectangle", accessibilityDescription: "Wallpaper")
+        item.button?.image = statusBarImage()
         item.button?.imagePosition = .imageOnly
+        item.button?.imageScaling = .scaleProportionallyDown
 
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "Abrir ajustes", action: #selector(openSettings), keyEquivalent: ","))
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Encerrar Wallpaper", action: #selector(quitApp), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: "Encerrar WallSync", action: #selector(quitApp), keyEquivalent: "q"))
 
         menu.items.forEach { $0.target = self }
         item.menu = menu
@@ -34,5 +35,19 @@ final class StatusItemController: NSObject {
     @objc
     private func quitApp() {
         onQuit?()
+    }
+
+    private func statusBarImage() -> NSImage {
+        if let logo = NSImage(named: NSImage.Name("BrandLogo")) {
+            let brandedLogo = (logo.copy() as? NSImage) ?? logo
+            brandedLogo.size = NSSize(width: 18, height: 18)
+            brandedLogo.isTemplate = false
+            return brandedLogo
+        }
+
+        return NSImage(
+            systemSymbolName: "play.rectangle.on.rectangle",
+            accessibilityDescription: "WallSync"
+        ) ?? NSImage()
     }
 }

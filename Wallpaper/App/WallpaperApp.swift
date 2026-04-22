@@ -5,7 +5,7 @@ struct WallpaperApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
-        WindowGroup("Wallpaper", id: "main") {
+        WindowGroup("WallSync", id: "main") {
             MainWindowSceneView()
                 .environment(appDelegate.coordinator)
                 .frame(minWidth: 1080, minHeight: 720)
