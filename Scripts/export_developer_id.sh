@@ -7,9 +7,15 @@ ARCHIVE_PATH="${ARCHIVE_PATH:-$ROOT_DIR/dist/archive/Wallpaper.xcarchive}"
 EXPORT_PATH="${EXPORT_PATH:-$ROOT_DIR/dist/export}"
 DEVELOPMENT_TEAM="${DEVELOPMENT_TEAM:?Set DEVELOPMENT_TEAM to your Apple Team ID.}"
 SIGNING_CERTIFICATE="${SIGNING_CERTIFICATE:-Developer ID Application}"
+ALLOW_PROVISIONING_UPDATES="${ALLOW_PROVISIONING_UPDATES:-1}"
 
 [[ -d "$ARCHIVE_PATH" ]] || { echo "Archive not found at $ARCHIVE_PATH" >&2; exit 1; }
 mkdir -p "$EXPORT_PATH"
+
+XCODEBUILD_FLAGS=()
+if [[ "$ALLOW_PROVISIONING_UPDATES" == "1" ]]; then
+  XCODEBUILD_FLAGS+=("-allowProvisioningUpdates")
+fi
 
 TEMP_PLIST="$(mktemp "$TMPDIR/wallpaper-export-options.XXXXXX.plist")"
 trap 'rm -f "$TEMP_PLIST"' EXIT
@@ -39,6 +45,7 @@ xcodebuild \
   -exportArchive \
   -archivePath "$ARCHIVE_PATH" \
   -exportPath "$EXPORT_PATH" \
-  -exportOptionsPlist "$TEMP_PLIST"
+  -exportOptionsPlist "$TEMP_PLIST" \
+  "${XCODEBUILD_FLAGS[@]}"
 
 echo "Developer ID export ready at $EXPORT_PATH"

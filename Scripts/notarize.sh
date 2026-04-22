@@ -12,6 +12,13 @@ xcrun notarytool submit "$ARTIFACT_PATH" \
   --keychain-profile "$NOTARY_PROFILE" \
   --wait
 
-xcrun stapler staple "$ARTIFACT_PATH"
+case "$ARTIFACT_PATH" in
+  *.app|*.dmg|*.pkg)
+    xcrun stapler staple "$ARTIFACT_PATH"
+    ;;
+  *)
+    echo "Skipping stapling for $ARTIFACT_PATH"
+    ;;
+esac
 
-echo "Notarized and stapled $ARTIFACT_PATH"
+echo "Notarized $ARTIFACT_PATH"
