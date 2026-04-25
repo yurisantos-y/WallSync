@@ -15,6 +15,7 @@ final class AppCoordinator {
     @ObservationIgnored let displayManager: DisplayManager
     @ObservationIgnored let energyPolicy: EnergyPolicyController
     @ObservationIgnored let startupLoginManager: StartupLoginManager
+    @ObservationIgnored let nativeDesktopPictureManager: NativeDesktopPictureManager
 
     @ObservationIgnored private let startupManager: StartupManager
     @ObservationIgnored private let reconciliationPolicy = SessionReconciliationPolicy()
@@ -47,6 +48,7 @@ final class AppCoordinator {
         let displayManager = DisplayManager()
         let energyPolicy = EnergyPolicyController()
         let startupLoginManager = StartupLoginManager()
+        let nativeDesktopPictureManager = NativeDesktopPictureManager()
         let startupManager = StartupManager()
         let powerSourceMonitor = PowerSourceMonitor()
         let thermalMonitor = ThermalMonitor()
@@ -63,6 +65,7 @@ final class AppCoordinator {
         self.displayManager = displayManager
         self.energyPolicy = energyPolicy
         self.startupLoginManager = startupLoginManager
+        self.nativeDesktopPictureManager = nativeDesktopPictureManager
         self.startupManager = startupManager
         self.powerSourceMonitor = powerSourceMonitor
         self.thermalMonitor = thermalMonitor
@@ -153,6 +156,8 @@ final class AppCoordinator {
                 if placements.isEmpty {
                     placements = [WallpaperPlacement(assetID: asset.id, scope: .allDisplays)]
                     try await settingsStore.savePlacements(placements)
+                    refreshRuntimeState()
+                    syncNativeDesktopPictures()
                 }
 
                 scheduleReconcile(trigger: .manual, reason: "asset_imported")
@@ -393,6 +398,7 @@ final class AppCoordinator {
         guard runtimeState.sleepState == .awake else { return }
 
         refreshRuntimeState()
+        syncNativeDesktopPictures()
 
         await sessionManager.reconcile(
             displays: runtimeState.activeDisplays,
@@ -418,6 +424,8 @@ final class AppCoordinator {
         Task {
             do {
                 try await settingsStore.savePlacements(placements)
+                refreshRuntimeState()
+                syncNativeDesktopPictures()
                 scheduleReconcile(trigger: .manual, reason: reason)
             } catch {
                 present(error)
@@ -482,6 +490,18 @@ final class AppCoordinator {
         var updated = runtimeState
         mutate(&updated)
         runtimeState = updated
+    }
+
+    private func syncNativeDesktopPictures() {
+        do {
+            try nativeDesktopPictureManager.syncDesktopPictures(
+                displays: runtimeState.activeDisplays,
+                assets: assets,
+                placements: placements
+            )
+        } catch {
+            present(error)
+        }
     }
 
     private func applicationWindows() -> [NSWindow] {

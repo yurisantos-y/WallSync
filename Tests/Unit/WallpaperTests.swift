@@ -271,6 +271,56 @@ final class WallpaperTests: XCTestCase {
         XCTAssertEqual(resolvedPlacement?.contentMode, .aspectFit)
     }
 
+    func testNativeDesktopPictureAssignmentsUseResolvedPostersPerDisplay() {
+        let primaryDisplay = makeDisplayTarget(displayUUID: "display-1", cgDisplayID: 1, isPrimary: true)
+        let secondaryDisplay = makeDisplayTarget(displayUUID: "display-2", cgDisplayID: 2, isPrimary: false)
+        let globalAsset = makeWallpaperAsset(posterImageRelativePath: "Posters/global.png")
+        let secondaryAsset = makeWallpaperAsset(posterImageRelativePath: "Posters/secondary.png")
+        let missingPosterAsset = makeWallpaperAsset(posterImageRelativePath: nil)
+
+        let assignments = NativeDesktopPictureManager.desiredAssignments(
+            displays: [primaryDisplay, secondaryDisplay],
+            assets: [globalAsset, secondaryAsset, missingPosterAsset],
+            placements: [
+                WallpaperPlacement(assetID: globalAsset.id, scope: .allDisplays, contentMode: .aspectFill),
+                WallpaperPlacement(assetID: secondaryAsset.id, scope: .specificDisplay(secondaryDisplay.displayUUID), contentMode: .aspectFit)
+            ]
+        )
+
+        XCTAssertEqual(
+            assignments,
+            [
+                NativeDesktopPictureAssignment(
+                    displayUUID: primaryDisplay.displayUUID,
+                    cgDisplayID: primaryDisplay.cgDisplayID,
+                    posterImageRelativePath: "Posters/global.png",
+                    contentMode: .aspectFill
+                ),
+                NativeDesktopPictureAssignment(
+                    displayUUID: secondaryDisplay.displayUUID,
+                    cgDisplayID: secondaryDisplay.cgDisplayID,
+                    posterImageRelativePath: "Posters/secondary.png",
+                    contentMode: .aspectFit
+                )
+            ]
+        )
+    }
+
+    func testNativeDesktopPictureAssignmentsSkipAssetsWithoutPoster() {
+        let display = makeDisplayTarget()
+        let asset = makeWallpaperAsset(posterImageRelativePath: nil)
+
+        let assignments = NativeDesktopPictureManager.desiredAssignments(
+            displays: [display],
+            assets: [asset],
+            placements: [
+                WallpaperPlacement(assetID: asset.id, scope: .allDisplays)
+            ]
+        )
+
+        XCTAssertTrue(assignments.isEmpty)
+    }
+
     func testFullscreenDetectorIgnoresHigherLayerSystemWindows() {
         let display = makeDisplayTarget()
         let detector = FullscreenWindowDetector()
@@ -402,16 +452,39 @@ private func repositoryRoot() -> URL {
         .deletingLastPathComponent()
 }
 
-private func makeDisplayTarget() -> DisplayTarget {
+private func makeDisplayTarget(
+    displayUUID: String = "display-1",
+    cgDisplayID: UInt32 = 1,
+    isPrimary: Bool = true
+) -> DisplayTarget {
     DisplayTarget(
-        displayUUID: "display-1",
-        cgDisplayID: 1,
+        displayUUID: displayUUID,
+        cgDisplayID: cgDisplayID,
         localizedName: "Studio Display",
         frame: CGRect(x: 0, y: 0, width: 1920, height: 1080),
         backingScaleFactor: 2,
-        isPrimary: true,
+        isPrimary: isPrimary,
         maximumFramesPerSecond: 60,
         hasSeparateSpaceContext: true
+    )
+}
+
+private func makeWallpaperAsset(posterImageRelativePath: String?) -> WallpaperAsset {
+    WallpaperAsset(
+        id: UUID(),
+        displayName: "Loop",
+        originalBookmarkID: UUID(),
+        originalPathHint: "/tmp/loop.mp4",
+        containerType: "mp4",
+        codecType: "HEVC",
+        pixelSize: CGSize(width: 1920, height: 1080),
+        frameRate: 30,
+        estimatedBitRate: 8_000_000,
+        duration: 12,
+        hasAudio: false,
+        posterImageRelativePath: posterImageRelativePath,
+        eligibility: .safeDefault,
+        importedAt: .now
     )
 }
 
