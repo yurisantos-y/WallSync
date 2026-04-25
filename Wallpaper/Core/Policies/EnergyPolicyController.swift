@@ -55,22 +55,30 @@ final class EnergyPolicyController {
     }
 
     func shouldUnloadSuspendedPlayback(for context: SystemContext, preferences: UserPreferences) -> Bool {
-        if context.thermalState == .critical {
-            return true
-        }
-
-        if context.thermalState == .serious && context.assetIsHeavy {
-            return true
-        }
-
-        guard preferences.fallbackMode == .batterySaver else {
-            return false
-        }
-
-        return context.onBattery || context.lowPowerMode || context.assetIsHeavy || context.activeDisplayCount > 1
+        shouldUnloadPlayback(for: .suspend, context: context, preferences: preferences)
     }
 
     func suspendedPlaybackGracePeriod(for context: SystemContext, preferences: UserPreferences) -> Duration {
+        playbackUnloadGracePeriod(for: .suspend, context: context, preferences: preferences) ?? .seconds(20)
+    }
+
+    func shouldUnloadPlayback(
+        for mode: SessionMode,
+        context: SystemContext,
+        preferences: UserPreferences
+    ) -> Bool {
+        playbackUnloadGracePeriod(for: mode, context: context, preferences: preferences) != nil
+    }
+
+    func playbackUnloadGracePeriod(
+        for mode: SessionMode,
+        context: SystemContext,
+        preferences: UserPreferences
+    ) -> Duration? {
+        guard mode == .poster || mode == .suspend else {
+            return nil
+        }
+
         if context.thermalState == .critical {
             return .seconds(2)
         }
@@ -79,18 +87,14 @@ final class EnergyPolicyController {
             return .seconds(6)
         }
 
-        if preferences.fallbackMode == .batterySaver {
-            if context.onBattery && context.assetIsHeavy {
-                return .seconds(4)
-            }
+        if (context.lowPowerMode || context.onBattery) && context.assetIsHeavy {
+            return .seconds(8)
+        }
 
-            if context.onBattery || context.lowPowerMode {
-                return .seconds(8)
-            }
-
+        if preferences.fallbackMode == .batterySaver && !context.isPrimaryDisplay {
             return .seconds(12)
         }
 
-        return .seconds(20)
+        return nil
     }
 }

@@ -11,6 +11,7 @@ final class AppCoordinator {
     @ObservationIgnored let posterCacheStore: PosterCacheStore
     @ObservationIgnored let metadataLoader: AssetMetadataLoader
     @ObservationIgnored let posterFrameGenerator: PosterFrameGenerator
+    @ObservationIgnored let videoAssetOptimizer: VideoAssetOptimizer
     @ObservationIgnored let displayManager: DisplayManager
     @ObservationIgnored let energyPolicy: EnergyPolicyController
     @ObservationIgnored let startupLoginManager: StartupLoginManager
@@ -42,6 +43,7 @@ final class AppCoordinator {
         let posterCacheStore = PosterCacheStore()
         let metadataLoader = AssetMetadataLoader()
         let posterFrameGenerator = PosterFrameGenerator()
+        let videoAssetOptimizer = VideoAssetOptimizer()
         let displayManager = DisplayManager()
         let energyPolicy = EnergyPolicyController()
         let startupLoginManager = StartupLoginManager()
@@ -57,6 +59,7 @@ final class AppCoordinator {
         self.posterCacheStore = posterCacheStore
         self.metadataLoader = metadataLoader
         self.posterFrameGenerator = posterFrameGenerator
+        self.videoAssetOptimizer = videoAssetOptimizer
         self.displayManager = displayManager
         self.energyPolicy = energyPolicy
         self.startupLoginManager = startupLoginManager
@@ -71,7 +74,8 @@ final class AppCoordinator {
             permissionStore: permissionStore,
             metadataLoader: metadataLoader,
             posterFrameGenerator: posterFrameGenerator,
-            posterCacheStore: posterCacheStore
+            posterCacheStore: posterCacheStore,
+            videoAssetOptimizer: videoAssetOptimizer
         )
 
         self.sessionManager = WallpaperSessionManager(

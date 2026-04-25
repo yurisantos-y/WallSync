@@ -3,6 +3,11 @@ import Foundation
 
 @MainActor
 final class WallpaperSessionManager {
+    private enum PreparedPlaybackSource {
+        case optimized
+        case original
+    }
+
     private struct SessionRuntime {
         var session: RenderSession
         var asset: WallpaperAsset
@@ -13,6 +18,8 @@ final class WallpaperSessionManager {
         var isFullscreen: Bool
         var isPrepared: Bool
         var hasAccessScope: Bool
+        var preparedPlaybackSource: PreparedPlaybackSource?
+        var optimizedPlaybackUnavailable: Bool
         var teardownTask: Task<Void, Never>?
     }
 
@@ -20,6 +27,7 @@ final class WallpaperSessionManager {
     private let posterCacheStore: PosterCacheStore
     private let energyPolicy: EnergyPolicyController
     private let reconciliationPolicy = SessionReconciliationPolicy()
+    private let playbackEvaluator = PlaybackEligibilityEvaluator()
 
     private var sessions: [String: SessionRuntime] = [:]
     private var currentPreferences = UserPreferences.defaultValue
@@ -89,6 +97,9 @@ final class WallpaperSessionManager {
     private func update(existingDisplayID: String, with desired: DesiredWallpaperSession) async {
         guard var runtime = sessions[existingDisplayID] else { return }
 
+        if runtime.asset.optimizedPlayback != desired.asset.optimizedPlayback {
+            runtime.optimizedPlaybackUnavailable = false
+        }
         runtime.asset = desired.asset
         runtime.placement = desired.placement
         runtime.isFullscreen = currentRuntimeState.fullscreenDisplayUUIDs.contains(desired.display.displayUUID)
@@ -128,6 +139,8 @@ final class WallpaperSessionManager {
             isFullscreen: currentRuntimeState.fullscreenDisplayUUIDs.contains(desired.display.displayUUID),
             isPrepared: false,
             hasAccessScope: false,
+            preparedPlaybackSource: nil,
+            optimizedPlaybackUnavailable: false,
             teardownTask: nil
         )
 
@@ -163,6 +176,7 @@ final class WallpaperSessionManager {
 
     private func applyPolicy(to runtime: inout SessionRuntime) async {
         runtime.isFullscreen = currentRuntimeState.fullscreenDisplayUUIDs.contains(runtime.session.displayTarget.displayUUID)
+        runtime.isOccluded = runtime.windowController.isOccluded
         runtime.session.displayTarget = runtime.windowController.displayTarget
 
         let context = systemContext(for: runtime)
@@ -174,6 +188,10 @@ final class WallpaperSessionManager {
 
             do {
                 try await ensurePlaybackPrepared(for: &runtime)
+                if energyPolicy.mode(for: systemContext(for: runtime), preferences: currentPreferences) != .animate {
+                    await applyPolicy(to: &runtime)
+                    return
+                }
                 if runtime.session.playbackState != .animating {
                     runtime.playbackController.play()
                 }
@@ -195,7 +213,6 @@ final class WallpaperSessionManager {
                 runtime.session.energyMode = .poster
             }
         case .poster:
-            cancelDeferredTeardown(for: &runtime)
             if runtime.session.playbackState != .poster || runtime.session.energyMode != .poster {
                 runtime.playbackController.showPoster()
             }
@@ -206,6 +223,7 @@ final class WallpaperSessionManager {
             runtime.session.playbackState = .poster
             runtime.session.windowState = .visible
             runtime.session.energyMode = .poster
+            schedulePlaybackUnloadIfNeeded(for: &runtime, mode: .poster, context: context)
         case .suspend:
             runtime.playbackController.pause()
             runtime.playbackController.showPoster()
@@ -228,20 +246,26 @@ final class WallpaperSessionManager {
             runtime.session.windowState = nextWindowState
             runtime.session.energyMode = .suspend
 
-            if (runtime.isOccluded || runtime.isFullscreen),
-               energyPolicy.shouldUnloadSuspendedPlayback(for: context, preferences: currentPreferences) {
-                scheduleDeferredTeardown(
-                    for: &runtime,
-                    after: energyPolicy.suspendedPlaybackGracePeriod(for: context, preferences: currentPreferences)
-                )
-            } else {
-                cancelDeferredTeardown(for: &runtime)
-            }
+            schedulePlaybackUnloadIfNeeded(for: &runtime, mode: .suspend, context: context)
         }
     }
 
     private func ensurePlaybackPrepared(for runtime: inout SessionRuntime) async throws {
         guard !runtime.isPrepared else { return }
+
+        if !runtime.optimizedPlaybackUnavailable,
+           let optimizedURL = optimizedPlaybackURL(for: runtime.asset) {
+            do {
+                try await runtime.playbackController.prepare(with: optimizedURL)
+                runtime.playbackController.attach(to: runtime.windowController.hostView, contentMode: runtime.placement.contentMode)
+                runtime.isPrepared = true
+                runtime.preparedPlaybackSource = .optimized
+                runtime.session.playbackState = .preparing
+                return
+            } catch {
+                runtime.optimizedPlaybackUnavailable = true
+            }
+        }
 
         let authorizedURL = try await permissionStore.resolveBookmark(id: runtime.asset.originalBookmarkID)
         runtime.hasAccessScope = true
@@ -250,6 +274,7 @@ final class WallpaperSessionManager {
             try await runtime.playbackController.prepare(with: authorizedURL)
             runtime.playbackController.attach(to: runtime.windowController.hostView, contentMode: runtime.placement.contentMode)
             runtime.isPrepared = true
+            runtime.preparedPlaybackSource = .original
             runtime.session.playbackState = .preparing
         } catch {
             if runtime.hasAccessScope {
@@ -263,6 +288,7 @@ final class WallpaperSessionManager {
     private func teardownPlayback(for runtime: inout SessionRuntime, reason: String) async {
         runtime.playbackController.teardown()
         runtime.isPrepared = false
+        runtime.preparedPlaybackSource = nil
 
         if runtime.hasAccessScope {
             await permissionStore.stopAccess(for: runtime.asset.originalBookmarkID)
@@ -294,9 +320,15 @@ final class WallpaperSessionManager {
         guard var runtime = sessions[displayID] else { return }
         runtime.teardownTask = nil
 
-        guard runtime.session.energyMode == .suspend,
-              runtime.isPrepared,
-              runtime.isOccluded || runtime.isFullscreen else {
+        guard runtime.session.energyMode == .poster || runtime.session.energyMode == .suspend,
+              runtime.isPrepared else {
+            sessions[displayID] = runtime
+            return
+        }
+
+        let mode = SessionMode(rawValue: runtime.session.energyMode.rawValue) ?? .suspend
+        let context = systemContext(for: runtime)
+        guard energyPolicy.shouldUnloadPlayback(for: mode, context: context, preferences: currentPreferences) else {
             sessions[displayID] = runtime
             return
         }
@@ -310,6 +342,24 @@ final class WallpaperSessionManager {
         onSessionsChanged?(sessions.values.map(\.session).sorted { $0.displayTarget.localizedName < $1.displayTarget.localizedName })
     }
 
+    private func schedulePlaybackUnloadIfNeeded(
+        for runtime: inout SessionRuntime,
+        mode: SessionMode,
+        context: SystemContext
+    ) {
+        guard runtime.isPrepared,
+              let gracePeriod = energyPolicy.playbackUnloadGracePeriod(
+                for: mode,
+                context: context,
+                preferences: currentPreferences
+              ) else {
+            cancelDeferredTeardown(for: &runtime)
+            return
+        }
+
+        scheduleDeferredTeardown(for: &runtime, after: gracePeriod)
+    }
+
     private func systemContext(for runtime: SessionRuntime) -> SystemContext {
         SystemContext(
             onBattery: currentRuntimeState.powerSource == .battery,
@@ -317,9 +367,39 @@ final class WallpaperSessionManager {
             thermalState: currentRuntimeState.thermalState,
             isOccluded: runtime.isOccluded,
             isFullscreen: runtime.isFullscreen,
-            assetIsHeavy: runtime.asset.eligibility.isHeavy,
+            assetIsHeavy: effectivePlaybackIsHeavy(for: runtime),
             isPrimaryDisplay: runtime.session.displayTarget.isPrimary,
             activeDisplayCount: currentRuntimeState.activeDisplays.count
         )
+    }
+
+    private func effectivePlaybackIsHeavy(for runtime: SessionRuntime) -> Bool {
+        if runtime.preparedPlaybackSource == .original || runtime.optimizedPlaybackUnavailable {
+            return runtime.asset.eligibility.isHeavy
+        }
+
+        guard let optimizedPlayback = runtime.asset.optimizedPlayback else {
+            return runtime.asset.eligibility.isHeavy
+        }
+
+        return playbackEvaluator.profile(
+            containerType: "mp4",
+            codecType: optimizedPlayback.codecType,
+            pixelSize: optimizedPlayback.pixelSize,
+            frameRate: optimizedPlayback.frameRate,
+            estimatedBitRate: optimizedPlayback.estimatedBitRate,
+            hardwareDecodeLikely: true
+        ).isHeavy
+    }
+
+    private func optimizedPlaybackURL(for asset: WallpaperAsset) -> URL? {
+        guard let optimizedPlayback = asset.optimizedPlayback,
+              let supportDirectory = try? FileManager.default.wallpaperApplicationSupportDirectory() else {
+            return nil
+        }
+
+        let url = supportDirectory.appendingPathComponent(optimizedPlayback.relativePath)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return url
     }
 }

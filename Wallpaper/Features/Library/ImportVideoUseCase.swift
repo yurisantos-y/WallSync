@@ -8,17 +8,20 @@ final class ImportVideoUseCase {
     private let metadataLoader: AssetMetadataLoader
     private let posterFrameGenerator: PosterFrameGenerator
     private let posterCacheStore: PosterCacheStore
+    private let videoAssetOptimizer: VideoAssetOptimizer
 
     init(
         permissionStore: FilePermissionStore,
         metadataLoader: AssetMetadataLoader,
         posterFrameGenerator: PosterFrameGenerator,
-        posterCacheStore: PosterCacheStore
+        posterCacheStore: PosterCacheStore,
+        videoAssetOptimizer: VideoAssetOptimizer
     ) {
         self.permissionStore = permissionStore
         self.metadataLoader = metadataLoader
         self.posterFrameGenerator = posterFrameGenerator
         self.posterCacheStore = posterCacheStore
+        self.videoAssetOptimizer = videoAssetOptimizer
     }
 
     func run() async throws -> WallpaperAsset? {
@@ -44,8 +47,19 @@ final class ImportVideoUseCase {
         }
 
         let metadata = try await metadataLoader.inspect(url: resolvedURL)
-        let poster = try? await posterFrameGenerator.generatePoster(for: resolvedURL)
         let assetID = UUID()
+        let maximumPixelSize = Self.maximumDisplayPixelSize()
+        let optimizedPlayback = try? await videoAssetOptimizer.optimize(
+            sourceURL: resolvedURL,
+            metadata: metadata,
+            assetID: assetID,
+            maximumPixelSize: maximumPixelSize
+        )
+        let posterSourceURL = Self.optimizedPlaybackURL(for: optimizedPlayback) ?? resolvedURL
+        let poster = try? await posterFrameGenerator.generatePoster(
+            for: posterSourceURL,
+            maxPixelSize: maximumPixelSize
+        )
         let posterPath: String?
         if let poster {
             posterPath = try await posterCacheStore.savePoster(poster, for: assetID)
@@ -64,10 +78,35 @@ final class ImportVideoUseCase {
             frameRate: metadata.frameRate,
             estimatedBitRate: metadata.estimatedBitRate,
             duration: metadata.duration,
+            optimizedPlayback: optimizedPlayback,
             hasAudio: metadata.hasAudio,
             posterImageRelativePath: posterPath,
             eligibility: metadata.playbackProfile,
             importedAt: .now
         )
+    }
+
+    private static func maximumDisplayPixelSize() -> CGSize {
+        NSScreen.screens
+            .map { screen in
+                CGSize(
+                    width: screen.frame.width * screen.backingScaleFactor,
+                    height: screen.frame.height * screen.backingScaleFactor
+                )
+            }
+            .max { lhs, rhs in
+                lhs.width * lhs.height < rhs.width * rhs.height
+            } ?? CGSize(width: 1920, height: 1080)
+    }
+
+    private static func optimizedPlaybackURL(for optimizedPlayback: OptimizedPlaybackAsset?) -> URL? {
+        guard let optimizedPlayback,
+              let supportDirectory = try? FileManager.default.wallpaperApplicationSupportDirectory() else {
+            return nil
+        }
+
+        let url = supportDirectory.appendingPathComponent(optimizedPlayback.relativePath)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        return url
     }
 }

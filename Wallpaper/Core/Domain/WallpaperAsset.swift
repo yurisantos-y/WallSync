@@ -1,5 +1,14 @@
 import Foundation
 
+struct OptimizedPlaybackAsset: Codable, Hashable, Sendable {
+    var relativePath: String
+    var codecType: String
+    var pixelSize: CGSize
+    var frameRate: Double
+    var estimatedBitRate: Double
+    var duration: TimeInterval
+}
+
 struct WallpaperAsset: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     var displayName: String
@@ -11,6 +20,7 @@ struct WallpaperAsset: Codable, Identifiable, Hashable, Sendable {
     var frameRate: Double
     var estimatedBitRate: Double
     var duration: TimeInterval
+    var optimizedPlayback: OptimizedPlaybackAsset? = nil
     var hasAudio: Bool
     var posterImageRelativePath: String?
     var eligibility: PlaybackProfile

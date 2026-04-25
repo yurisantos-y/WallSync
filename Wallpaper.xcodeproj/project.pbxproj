@@ -51,6 +51,8 @@
 		A382319A856B4D26B12957BE /* AppCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A9BAB7A780E6B72169896CB /* AppCoordinator.swift */; };
 		A57944E70B2195758D95611C /* SettingsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1DB0362C37DDF99B78E9DAE /* SettingsStore.swift */; };
 		A627F899330AE634BF14A911 /* AssetMetadataLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB990290CF22B330866A5016 /* AssetMetadataLoader.swift */; };
+		AABBCCDDEEFF001122334455 /* VideoAssetOptimizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122334457 /* VideoAssetOptimizer.swift */; };
+		AABBCCDDEEFF001122334456 /* DisplayOcclusionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122334458 /* DisplayOcclusionDetector.swift */; };
 		ACA3320DFFCB4B636D24ECAD /* DisplayAssignmentsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E7EF1AC2035FB6A25FAB56 /* DisplayAssignmentsViewModel.swift */; };
 		B2D004E8711656F41A2BCA74 /* AppRuntimeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE858EB946BB59E679C39AE7 /* AppRuntimeState.swift */; };
 		B991CA1267F51754BE0AFCFD /* DisplaysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9353509C95268345A8A8098 /* DisplaysView.swift */; };
@@ -115,6 +117,8 @@
 		A2E7EF1AC2035FB6A25FAB56 /* DisplayAssignmentsViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DisplayAssignmentsViewModel.swift; path = Wallpaper/Features/Displays/DisplayAssignmentsViewModel.swift; sourceTree = "<group>"; };
 		A902EA65EC29AB0CEFBA3EFB /* FileManager+Wallpaper.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "FileManager+Wallpaper.swift"; path = "Wallpaper/Utilities/Extensions/FileManager+Wallpaper.swift"; sourceTree = "<group>"; };
 		AB990290CF22B330866A5016 /* AssetMetadataLoader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AssetMetadataLoader.swift; path = Wallpaper/Infrastructure/AVFoundation/AssetMetadataLoader.swift; sourceTree = "<group>"; };
+		AABBCCDDEEFF001122334457 /* VideoAssetOptimizer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = VideoAssetOptimizer.swift; path = Wallpaper/Infrastructure/AVFoundation/VideoAssetOptimizer.swift; sourceTree = "<group>"; };
+		AABBCCDDEEFF001122334458 /* DisplayOcclusionDetector.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DisplayOcclusionDetector.swift; path = Wallpaper/Infrastructure/System/DisplayOcclusionDetector.swift; sourceTree = "<group>"; };
 		B3C085DC2FD85385A27CCFE6 /* PlaybackProfile.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PlaybackProfile.swift; path = Wallpaper/Core/Domain/PlaybackProfile.swift; sourceTree = "<group>"; };
 		B53B0C2668EBC342E6E6CFFA /* SystemEventMonitor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SystemEventMonitor.swift; path = Wallpaper/Infrastructure/System/SystemEventMonitor.swift; sourceTree = "<group>"; };
 		B53F8CF1527198785D11BC25 /* PosterFrameGenerator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PosterFrameGenerator.swift; path = Wallpaper/Infrastructure/AVFoundation/PosterFrameGenerator.swift; sourceTree = "<group>"; };
@@ -244,6 +248,7 @@
 			isa = PBXGroup;
 			children = (
 				C49434CB909302F52D1EE58C /* DisplayManager.swift */,
+				AABBCCDDEEFF001122334458 /* DisplayOcclusionDetector.swift */,
 				2F74379DB4BE675191754C80 /* FullscreenWindowDetector.swift */,
 				C223D00AC7F9B15A6BA4E67A /* PowerSourceMonitor.swift */,
 				247A2D4C1E25D205673268FC /* StartupLoginManager.swift */,
@@ -272,6 +277,7 @@
 				AB990290CF22B330866A5016 /* AssetMetadataLoader.swift */,
 				B53F8CF1527198785D11BC25 /* PosterFrameGenerator.swift */,
 				5EB7554041A0D264BF1454D4 /* VideoCapabilityInspector.swift */,
+				AABBCCDDEEFF001122334457 /* VideoAssetOptimizer.swift */,
 			);
 			name = AVFoundation;
 			sourceTree = "<group>";
@@ -561,6 +567,7 @@
 				A627F899330AE634BF14A911 /* AssetMetadataLoader.swift in Sources */,
 				7CD0657F590D0DA55F09A08C /* PosterFrameGenerator.swift in Sources */,
 				FB1F92F79540728F883D2088 /* VideoCapabilityInspector.swift in Sources */,
+				AABBCCDDEEFF001122334455 /* VideoAssetOptimizer.swift in Sources */,
 				2F1173786ADB31092BB27566 /* DesktopWallpaperWindow.swift in Sources */,
 				7D4F312245B2C7FB1C19EC5C /* DesktopWallpaperWindowController.swift in Sources */,
 				7623F9EB50B58C8EE665ADB6 /* OcclusionObserver.swift in Sources */,
@@ -570,6 +577,7 @@
 				14BC10C70EBE99CEB04B516A /* PosterCacheStore.swift in Sources */,
 				A57944E70B2195758D95611C /* SettingsStore.swift in Sources */,
 				46585D9B60D59C363628E4A7 /* DisplayManager.swift in Sources */,
+				AABBCCDDEEFF001122334456 /* DisplayOcclusionDetector.swift in Sources */,
 				4DCAAD40125BC004264ED467 /* FullscreenWindowDetector.swift in Sources */,
 				8387891382372256965ED406 /* PowerSourceMonitor.swift in Sources */,
 				CFC731725BE045D4EE743BD9 /* StartupLoginManager.swift in Sources */,
@@ -609,6 +617,7 @@
 				CODE_SIGN_ENTITLEMENTS = Wallpaper/Resources/Wallpaper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = N6R4DGCKS8;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Wallpaper/Resources/Info.plist;
@@ -688,17 +697,22 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_COVERAGE_MAPPING = NO;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Wallpaper/Resources/Wallpaper.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = N6R4DGCKS8;
+				ENABLE_CODE_COVERAGE = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
+				GCC_GENERATE_TEST_COVERAGE_FILES = NO;
+				GCC_INSTRUMENT_PROGRAM_FLOW_ARCS = NO;
 				INFOPLIST_FILE = Wallpaper/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yurisantos.wallpaper;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = WallSync;
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 6.0;
@@ -711,6 +725,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = N6R4DGCKS8;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yurisantos.wallpaper.tests;
@@ -727,6 +742,7 @@
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_COVERAGE_MAPPING = NO;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
 				CLANG_CXX_LIBRARY = "libc++";
 				CLANG_ENABLE_MODULES = YES;
@@ -756,9 +772,12 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_CODE_COVERAGE = NO;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_GENERATE_TEST_COVERAGE_FILES = NO;
+				GCC_INSTRUMENT_PROGRAM_FLOW_ARCS = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
@@ -781,6 +800,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = N6R4DGCKS8;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.yurisantos.wallpaper.tests;

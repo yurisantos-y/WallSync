@@ -8,7 +8,8 @@ actor PosterCacheStore {
     init(fileManager: FileManager = .default) {
         let supportDirectory = try! fileManager.wallpaperApplicationSupportDirectory()
         self.postersDirectory = supportDirectory.appendingPathComponent("Posters", isDirectory: true)
-        memoryCache.countLimit = 64
+        memoryCache.countLimit = 32
+        memoryCache.totalCostLimit = 96 * 1024 * 1024
 
         if !fileManager.fileExists(atPath: postersDirectory.path) {
             try? fileManager.createDirectory(at: postersDirectory, withIntermediateDirectories: true)
@@ -22,7 +23,7 @@ actor PosterCacheStore {
             throw PosterCacheError.encodingFailed
         }
         try data.write(to: destination, options: .atomic)
-        memoryCache.setObject(image, forKey: relativePath as NSString)
+        memoryCache.setObject(image, forKey: relativePath as NSString, cost: image.memoryCost)
         return relativePath
     }
 
@@ -37,9 +38,23 @@ actor PosterCacheStore {
         guard let supportDirectory else { return nil }
         let image = NSImage(contentsOf: supportDirectory.appendingPathComponent(relativePath))
         if let image {
-            memoryCache.setObject(image, forKey: cacheKey)
+            memoryCache.setObject(image, forKey: cacheKey, cost: image.memoryCost)
         }
         return image
+    }
+}
+
+private extension NSImage {
+    var memoryCost: Int {
+        guard let representation = representations.first else {
+            let width = max(1, Int(size.width))
+            let height = max(1, Int(size.height))
+            return width * height * 4
+        }
+
+        let width = max(1, representation.pixelsWide)
+        let height = max(1, representation.pixelsHigh)
+        return width * height * 4
     }
 }
 

@@ -8,6 +8,7 @@ final class DesktopWallpaperWindowController: NSWindowController {
     var onOcclusionChange: ((Bool) -> Void)?
 
     private let occlusionObserver = OcclusionObserver()
+    private let displayOcclusionDetector = DisplayOcclusionDetector()
     private var isWindowVisible = false
 
     init(displayTarget: DisplayTarget) {
@@ -20,8 +21,9 @@ final class DesktopWallpaperWindowController: NSWindowController {
         window.setFrame(displayTarget.frame, display: true)
         show()
 
-        occlusionObserver.startObserving(window: window) { [weak self] isOccluded in
-            self?.onOcclusionChange?(isOccluded)
+        occlusionObserver.startObserving(window: window) { [weak self] _ in
+            guard let self else { return }
+            self.onOcclusionChange?(self.isOccluded)
         }
     }
 
@@ -31,7 +33,7 @@ final class DesktopWallpaperWindowController: NSWindowController {
 
     var isOccluded: Bool {
         guard let window else { return true }
-        return !window.occlusionState.contains(.visible)
+        return !window.occlusionState.contains(.visible) || displayOcclusionDetector.isDisplayCovered(displayTarget)
     }
 
     func updateDisplayTarget(_ target: DisplayTarget) {
@@ -46,6 +48,8 @@ final class DesktopWallpaperWindowController: NSWindowController {
         if window?.frame != target.frame {
             window?.setFrame(target.frame, display: false, animate: false)
         }
+
+        onOcclusionChange?(isOccluded)
     }
 
     func show() {
