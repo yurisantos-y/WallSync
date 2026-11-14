@@ -28,6 +28,7 @@
 		4E023E01CFEA7C53901B5D6A /* DisplayTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7192FEBD9257C2FDA742A092 /* DisplayTarget.swift */; };
 		5E2857AD8079AB288C7498E2 /* AVPlayerPlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = C23A6B0F47A003806F482133 /* AVPlayerPlaybackEngine.swift */; };
 		659A4D0ACF714BEE9CBA839A /* AssetInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40DBA0D7F360016425ADA704 /* AssetInspector.swift */; };
+		66691F128A008992754B9722 /* DiagnosticsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EB56797056721E4AC00B979 /* DiagnosticsSettingsView.swift */; };
 		6677CEBADA9C42068D2F0348 /* SessionReconciliationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66CA5DFBCD827D8D512B3817 /* SessionReconciliationPolicy.swift */; };
 		672FF7BC6D5CF03BEDF049F3 /* SettingsStoring.swift in Sources */ = {isa = PBXBuildFile; fileRef = B738591B02825BB54BC7EE71 /* SettingsStoring.swift */; };
 		6AEB0AA2FEAF6A6D21CC5425 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E36CC9824046DE3174592693 /* Assets.xcassets */; };
@@ -51,8 +52,10 @@
 		8E402206425E79847BEA421E /* WallpaperPlacementEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 769C5C6681CCA99AD1B92B83 /* WallpaperPlacementEditor.swift */; };
 		91FE7B0B81208000BF797866 /* FilePermissionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E15123968F08AD96DC79E60F /* FilePermissionStore.swift */; };
 		95AB2D71D599ADD63DED279C /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9289FA9C2A0E599C5D2DC929 /* Cocoa.framework */; };
+		993FED46F01E9E2352287910 /* DiagnosticsSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DE3609A8650828EEBD66D09 /* DiagnosticsSummary.swift */; };
 		995B74426B6F391145286EB3 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFF6BA796CCB67B074D377DE /* LibraryView.swift */; };
 		9B504212B05D3C3CC3B077E4 /* ContainerFormatDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1302B0FE66AC5F0658B73B80 /* ContainerFormatDetector.swift */; };
+		9DC7AEF289A75D9E37F4D423 /* DisplayLabels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4443C8DCCC4446ED6A5A8D6E /* DisplayLabels.swift */; };
 		A0D660DD04DAC33BDFD15852 /* WallpaperHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D12F4326D9C4AF891175955 /* WallpaperHostView.swift */; };
 		A0F233E35ED250A3746167F1 /* UserPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0A170F59F9DA8AE395565BF /* UserPreferences.swift */; };
 		A2474E03084AA6FB229FC1E0 /* ThermalMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2739FA80286E78266F4E9BFF /* ThermalMonitor.swift */; };
@@ -67,9 +70,11 @@
 		BE232D8E88A0726491A35B66 /* WallpaperTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F73F470494EB0545D4F0350F /* WallpaperTests.swift */; };
 		C557BE36575D7A2639C2CEE5 /* SystemEventMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B53B0C2668EBC342E6E6CFFA /* SystemEventMonitor.swift */; };
 		C8159BE086F120A0A677D31C /* StorageLocations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65CA2D4AC0521E7FD8C87A7C /* StorageLocations.swift */; };
+		C9DC5B82907F3EC71610C080 /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA7680589BF851201426066A /* Log.swift */; };
 		CC1384BCD85F8EFDBC375023 /* NSScreen+Display.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C9150A3F36685E85DBEC608 /* NSScreen+Display.swift */; };
 		CC44C4FC98D0D341600D7D4F /* PlaybackProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3C085DC2FD85385A27CCFE6 /* PlaybackProfile.swift */; };
 		CFC731725BE045D4EE743BD9 /* StartupLoginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 247A2D4C1E25D205673268FC /* StartupLoginManager.swift */; };
+		DAD27EC36D6043AF20CF69E8 /* MetricsSubscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3C2AD82261E6A84969BF301 /* MetricsSubscriber.swift */; };
 		DDDA4D310BD8F59E9E5B9BA7 /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146420A48A1824080F224545 /* GeneralSettingsView.swift */; };
 		F40F00247AC0D65DEC57D5AE /* WindowListProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 019D7E640C8622F5A1C18C7D /* WindowListProvider.swift */; };
 		F543D226953A965B94F9265E /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBFE01CD35D6D91C783323D8 /* TestSupport.swift */; };
@@ -104,12 +109,14 @@
 		1B5AE67FEA80F0A059C1E262 /* AccessBookmark.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AccessBookmark.swift; path = Wallpaper/Core/Domain/AccessBookmark.swift; sourceTree = "<group>"; };
 		247A2D4C1E25D205673268FC /* StartupLoginManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StartupLoginManager.swift; path = Wallpaper/Infrastructure/System/StartupLoginManager.swift; sourceTree = "<group>"; };
 		2739FA80286E78266F4E9BFF /* ThermalMonitor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ThermalMonitor.swift; path = Wallpaper/Infrastructure/System/ThermalMonitor.swift; sourceTree = "<group>"; };
+		2EB56797056721E4AC00B979 /* DiagnosticsSettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DiagnosticsSettingsView.swift; path = Wallpaper/Features/Settings/DiagnosticsSettingsView.swift; sourceTree = "<group>"; };
 		2F74379DB4BE675191754C80 /* FullscreenWindowDetector.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = FullscreenWindowDetector.swift; path = Wallpaper/Infrastructure/System/FullscreenWindowDetector.swift; sourceTree = "<group>"; };
 		381CD2912A80A801DF0713CB /* SettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsView.swift; path = Wallpaper/Features/Settings/SettingsView.swift; sourceTree = "<group>"; };
 		3A16F62C32CC8D49A784FC9C /* StartupSettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StartupSettingsView.swift; path = Wallpaper/Features/Settings/StartupSettingsView.swift; sourceTree = "<group>"; };
 		3C9150A3F36685E85DBEC608 /* NSScreen+Display.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "NSScreen+Display.swift"; path = "Wallpaper/Utilities/Extensions/NSScreen+Display.swift"; sourceTree = "<group>"; };
 		3D12F4326D9C4AF891175955 /* WallpaperHostView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WallpaperHostView.swift; path = Wallpaper/Infrastructure/AppKit/WallpaperHostView.swift; sourceTree = "<group>"; };
 		40DBA0D7F360016425ADA704 /* AssetInspector.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AssetInspector.swift; path = Wallpaper/Features/Library/AssetInspector.swift; sourceTree = "<group>"; };
+		4443C8DCCC4446ED6A5A8D6E /* DisplayLabels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DisplayLabels.swift; path = Wallpaper/Features/Settings/DisplayLabels.swift; sourceTree = "<group>"; };
 		4639427A439E618C7F4927C5 /* AppDelegate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Wallpaper/App/AppDelegate.swift; sourceTree = "<group>"; };
 		4CA49175DC7B9071AB73A72A /* PlaybackEligibilityEvaluator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PlaybackEligibilityEvaluator.swift; path = Wallpaper/Core/Policies/PlaybackEligibilityEvaluator.swift; sourceTree = "<group>"; };
 		537E306C5E15512FD4EACB52 /* ImportVideoUseCase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ImportVideoUseCase.swift; path = Wallpaper/Features/Library/ImportVideoUseCase.swift; sourceTree = "<group>"; };
@@ -127,6 +134,7 @@
 		8459CF0FD219F66414A1051E /* LiveSessionEnvironment.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = LiveSessionEnvironment.swift; path = Wallpaper/App/LiveSessionEnvironment.swift; sourceTree = "<group>"; };
 		8960647F63A6C8139BC47EE0 /* AssetCatalogStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AssetCatalogStore.swift; path = Wallpaper/Infrastructure/Storage/AssetCatalogStore.swift; sourceTree = "<group>"; };
 		8C449B198F1AE6055B5635F7 /* RenderSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RenderSession.swift; path = Wallpaper/Core/Domain/RenderSession.swift; sourceTree = "<group>"; };
+		8DE3609A8650828EEBD66D09 /* DiagnosticsSummary.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DiagnosticsSummary.swift; path = Wallpaper/Core/Policies/DiagnosticsSummary.swift; sourceTree = "<group>"; };
 		91B9C4B7379809D4FE1A3F58 /* PosterCacheStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PosterCacheStore.swift; path = Wallpaper/Infrastructure/Storage/PosterCacheStore.swift; sourceTree = "<group>"; };
 		9289FA9C2A0E599C5D2DC929 /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		9A9BAB7A780E6B72169896CB /* AppCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AppCoordinator.swift; path = Wallpaper/App/AppCoordinator.swift; sourceTree = "<group>"; };
@@ -141,10 +149,12 @@
 		B53B0C2668EBC342E6E6CFFA /* SystemEventMonitor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SystemEventMonitor.swift; path = Wallpaper/Infrastructure/System/SystemEventMonitor.swift; sourceTree = "<group>"; };
 		B53F8CF1527198785D11BC25 /* PosterFrameGenerator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PosterFrameGenerator.swift; path = Wallpaper/Infrastructure/AVFoundation/PosterFrameGenerator.swift; sourceTree = "<group>"; };
 		B738591B02825BB54BC7EE71 /* SettingsStoring.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SettingsStoring.swift; path = Wallpaper/Core/Protocols/SettingsStoring.swift; sourceTree = "<group>"; };
+		BA7680589BF851201426066A /* Log.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Log.swift; path = Wallpaper/Utilities/Log.swift; sourceTree = "<group>"; };
 		BB688EF1BD7009C298CC1681 /* SessionRuntimeProtocols.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SessionRuntimeProtocols.swift; path = Wallpaper/Core/Protocols/SessionRuntimeProtocols.swift; sourceTree = "<group>"; };
 		C0A2B0B64C1564DE54CE15EA /* OcclusionObserver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OcclusionObserver.swift; path = Wallpaper/Infrastructure/AppKit/OcclusionObserver.swift; sourceTree = "<group>"; };
 		C223D00AC7F9B15A6BA4E67A /* PowerSourceMonitor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PowerSourceMonitor.swift; path = Wallpaper/Infrastructure/System/PowerSourceMonitor.swift; sourceTree = "<group>"; };
 		C23A6B0F47A003806F482133 /* AVPlayerPlaybackEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = AVPlayerPlaybackEngine.swift; path = Wallpaper/Infrastructure/AVFoundation/AVPlayerPlaybackEngine.swift; sourceTree = "<group>"; };
+		C3C2AD82261E6A84969BF301 /* MetricsSubscriber.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = MetricsSubscriber.swift; path = Wallpaper/Infrastructure/System/MetricsSubscriber.swift; sourceTree = "<group>"; };
 		C49434CB909302F52D1EE58C /* DisplayManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DisplayManager.swift; path = Wallpaper/Infrastructure/System/DisplayManager.swift; sourceTree = "<group>"; };
 		C5FFD6ED049A1F0F52D7A02F /* Localizable.xcstrings */ = {isa = PBXFileReference; includeInIndex = 1; name = Localizable.xcstrings; path = Wallpaper/Resources/Localizable.xcstrings; sourceTree = "<group>"; };
 		CC1633781A31AEB21047059D /* StartupManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StartupManager.swift; path = Wallpaper/App/StartupManager.swift; sourceTree = "<group>"; };
@@ -199,6 +209,8 @@
 				146420A48A1824080F224545 /* GeneralSettingsView.swift */,
 				381CD2912A80A801DF0713CB /* SettingsView.swift */,
 				3A16F62C32CC8D49A784FC9C /* StartupSettingsView.swift */,
+				2EB56797056721E4AC00B979 /* DiagnosticsSettingsView.swift */,
+				4443C8DCCC4446ED6A5A8D6E /* DisplayLabels.swift */,
 			);
 			name = Settings;
 			sourceTree = "<group>";
@@ -212,6 +224,7 @@
 				1302B0FE66AC5F0658B73B80 /* ContainerFormatDetector.swift */,
 				B01643CF7139B2D70BA9E0EC /* OrphanCleanupPolicy.swift */,
 				76BED63829E7F296435972D1 /* StartupRestoreGate.swift */,
+				8DE3609A8650828EEBD66D09 /* DiagnosticsSummary.swift */,
 			);
 			name = Policies;
 			sourceTree = "<group>";
@@ -257,6 +270,7 @@
 			children = (
 				06C568AADF424B5B93D17BCE /* Concurrency */,
 				D94B7DEE146FA6D192134282 /* Extensions */,
+				BA7680589BF851201426066A /* Log.swift */,
 			);
 			name = Utilities;
 			sourceTree = "<group>";
@@ -281,6 +295,7 @@
 				B53B0C2668EBC342E6E6CFFA /* SystemEventMonitor.swift */,
 				2739FA80286E78266F4E9BFF /* ThermalMonitor.swift */,
 				019D7E640C8622F5A1C18C7D /* WindowListProvider.swift */,
+				C3C2AD82261E6A84969BF301 /* MetricsSubscriber.swift */,
 			);
 			name = System;
 			sourceTree = "<group>";
@@ -627,6 +642,11 @@
 				C8159BE086F120A0A677D31C /* StorageLocations.swift in Sources */,
 				32D65091ED65DBCD8B5A697B /* WindowListSnapshot.swift in Sources */,
 				F40F00247AC0D65DEC57D5AE /* WindowListProvider.swift in Sources */,
+				993FED46F01E9E2352287910 /* DiagnosticsSummary.swift in Sources */,
+				66691F128A008992754B9722 /* DiagnosticsSettingsView.swift in Sources */,
+				9DC7AEF289A75D9E37F4D423 /* DisplayLabels.swift in Sources */,
+				DAD27EC36D6043AF20CF69E8 /* MetricsSubscriber.swift in Sources */,
+				C9DC5B82907F3EC71610C080 /* Log.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -12,6 +12,8 @@ actor PosterFrameGenerator {
     }
 
     func generatePosterImage(for url: URL, maxPixelSize: CGSize) throws -> CGImage {
+        let signpost = Signpost.begin(Signpost.Name.posterGeneration)
+        defer { Signpost.end(Signpost.Name.posterGeneration, signpost) }
         let asset = AVURLAsset(url: url)
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true

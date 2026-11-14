@@ -74,7 +74,7 @@ struct WallpaperPlacementEditor: View {
                     Spacer()
 
                     if let session = coordinator.session(for: display) {
-                        Text("Sessao: \(session.playbackState.displayLabel) • \(session.energyMode.displayLabel)")
+                        Text("Sessao: \(session.playbackState.localizedLabel) • \(session.energyMode.localizedLabel)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
@@ -115,69 +115,11 @@ struct WallpaperPlacementEditor: View {
             }
 
             if let session = coordinator.session(for: display) {
-                WallpaperStatusPill(label: session.playbackState.displayLabel, color: session.playbackState.color)
-                WallpaperStatusPill(label: session.energyMode.displayLabel, color: session.energyMode.color)
+                WallpaperStatusPill(label: session.playbackState.localizedLabel, color: session.playbackState.color)
+                WallpaperStatusPill(label: session.energyMode.localizedLabel, color: session.energyMode.color)
             } else {
                 WallpaperStatusPill(label: "Idle", color: .gray)
             }
-        }
-    }
-}
-
-private extension RenderSession.PlaybackState {
-    var displayLabel: String {
-        switch self {
-        case .idle:
-            return "Idle"
-        case .preparing:
-            return "Preparing"
-        case .animating:
-            return "Animating"
-        case .poster:
-            return "Poster"
-        case .paused:
-            return "Paused"
-        case .failed:
-            return "Failed"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .animating:
-            return .green
-        case .poster:
-            return .orange
-        case .paused, .idle:
-            return .gray
-        case .preparing:
-            return .blue
-        case .failed:
-            return .red
-        }
-    }
-}
-
-private extension RenderSession.EnergyMode {
-    var displayLabel: String {
-        switch self {
-        case .animate:
-            return "Animate"
-        case .poster:
-            return "Poster"
-        case .suspend:
-            return "Suspend"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .animate:
-            return .green
-        case .poster:
-            return .orange
-        case .suspend:
-            return .gray
         }
     }
 }

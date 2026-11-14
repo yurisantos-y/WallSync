@@ -237,3 +237,34 @@ final class StorageTests: XCTestCase {
         }
     }
 }
+
+final class DiagnosticsSummaryTests: XCTestCase {
+    func testSummaryListsEveryDisplayWithModeReasonAndStream() {
+        let displays = [Fixture.display("a", id: 1), Fixture.display("b", id: 2, isPrimary: false)]
+        var state = AppRuntimeState.initial
+        state.activeDisplays = displays
+        state.powerSource = .battery
+
+        var session = RenderSession(
+            id: UUID(), displayTarget: displays[0], assetID: UUID(), windowState: .suspended,
+            playbackState: .paused, energyMode: .suspend, startedAt: .now, lastVisibilityChange: .now
+        )
+        session.modeReason = .occluded
+        session.playbackSource = .optimized
+        session.videoPixelSize = CGSize(width: 3840, height: 2160)
+        session.videoFrameRate = 30
+        session.videoCodec = "HEVC"
+
+        let text = DiagnosticsSummary.text(
+            appVersion: "1.2 (3)", runtimeState: state, preferences: .defaultValue, sessions: [session], assets: []
+        )
+
+        XCTAssertTrue(text.contains("WallSync 1.2 (3)"))
+        XCTAssertTrue(text.contains("power=battery"))
+        XCTAssertTrue(text.contains("energy=suspend reason=occluded playback=paused window=suspended source=optimized"))
+        XCTAssertTrue(text.contains("video: 3840x2160 30 fps HEVC"))
+        XCTAssertTrue(text.contains("[Display b]"))
+        XCTAssertTrue(text.contains("no session"))
+        XCTAssertFalse(text.contains("/tmp/"), "file paths never appear in the report")
+    }
+}

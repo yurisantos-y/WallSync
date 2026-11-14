@@ -27,6 +27,7 @@ final class AppCoordinator {
     @ObservationIgnored private let systemMonitor: SystemEventMonitor
     @ObservationIgnored private let sessionManager: WallpaperSessionManager
     @ObservationIgnored private let janitor: AssetStorageJanitor
+    @ObservationIgnored private let metricsSubscriber = MetricsSubscriber()
     @ObservationIgnored private var scheduledReconcileTask: Task<Void, Never>?
     @ObservationIgnored private var restoreGate = StartupRestoreGate()
     @ObservationIgnored private var startupIssues: [StorageIssue] = []
@@ -129,6 +130,8 @@ final class AppCoordinator {
     func start() {
         statusItemController.start()
         systemMonitor.start()
+        metricsSubscriber.start()
+        Log.session.notice("WallSync \(Self.appVersion, privacy: .public) started")
 
         Task {
             await loadPersistedState()
@@ -141,6 +144,24 @@ final class AppCoordinator {
         scheduledReconcileTask?.cancel()
         systemMonitor.stop()
         await sessionManager.stopAll()
+    }
+
+    static var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = info?["CFBundleVersion"] as? String ?? "?"
+        return "\(version) (\(build))"
+    }
+
+    /// Plain-text snapshot of the runtime state, for support requests.
+    func diagnosticsSummary() -> String {
+        DiagnosticsSummary.text(
+            appVersion: Self.appVersion,
+            runtimeState: runtimeState,
+            preferences: preferences,
+            sessions: activeSessions,
+            assets: assets
+        )
     }
 
     func dismissError() {
@@ -426,6 +447,7 @@ final class AppCoordinator {
         startupIssues.append(
             contentsOf: [loadedPreferences.issue, loadedPlacements.issue, loadedAssets.issue, bookmarkIssue].compactMap { $0 }
         )
+        Log.storage.info("loaded \(self.assets.count) assets, \(self.placements.count) placements, issues=\(self.startupIssues.count)")
         if !startupIssues.isEmpty {
             lastErrorMessage = startupIssues.map(\.message).joined(separator: "\n")
         }
@@ -433,7 +455,10 @@ final class AppCoordinator {
         // Never sweep "orphans" against a catalog that failed to load: every
         // file would look unreferenced.
         if loadedAssets.issue == nil && startupIssues.allSatisfy({ if case .storageUnavailable = $0 { return false } else { return true } }) {
-            await janitor.removeOrphans(keeping: assets)
+            let reclaimed = await janitor.removeOrphans(keeping: assets)
+            if reclaimed > 0 {
+                Log.storage.notice("removed orphaned media, reclaimed \(reclaimed) bytes")
+            }
             if bookmarkIssue == nil {
                 _ = try? await permissionStore.pruneBookmarks(keeping: Set(assets.map(\.originalBookmarkID)))
             }
@@ -462,7 +487,8 @@ final class AppCoordinator {
                 assets: assets,
                 placements: placements,
                 preferences: preferences,
-                runtimeState: runtimeState
+                runtimeState: runtimeState,
+                reason: reason
             )
         )
     }
@@ -506,6 +532,7 @@ final class AppCoordinator {
     }
 
     private func handleSystemEvent(_ event: SystemEventMonitor.Event) {
+        Log.energy.debug("system event: \(String(describing: event), privacy: .public)")
         switch event {
         case .willSleep:
             scheduledReconcileTask?.cancel()
@@ -532,6 +559,7 @@ final class AppCoordinator {
     }
 
     private func present(_ error: Error) {
+        Log.session.error("presenting error: \(error.localizedDescription, privacy: .public)")
         lastErrorMessage = error.localizedDescription
     }
 

@@ -31,6 +31,11 @@ struct RenderSession: Identifiable, Hashable, Sendable {
     var startedAt: Date
     var lastVisibilityChange: Date
     var playbackSource: PlaybackSource? = nil
+    var modeReason: SessionModeReason = .none
+    /// Properties of the stream that is (or would be) decoded.
+    var videoPixelSize: CGSize? = nil
+    var videoFrameRate: Double? = nil
+    var videoCodec: String? = nil
 
     enum PlaybackSource: String, Codable, Sendable {
         case optimized

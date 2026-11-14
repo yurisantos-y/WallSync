@@ -9,6 +9,8 @@ struct SessionReconcileRequest: Sendable {
     var placements: [WallpaperPlacement]
     var preferences: UserPreferences
     var runtimeState: AppRuntimeState
+    /// What caused this reconcile; only used for logging.
+    var reason: String = "unspecified"
 }
 
 /// Owns every wallpaper window and playback engine.
@@ -26,6 +28,7 @@ final class WallpaperSessionManager {
         var placement: WallpaperPlacement
         let surface: any WallpaperSurface
         var mode: SessionMode = .suspend
+        var modeReason: SessionModeReason = .none
         var isOccluded = false
         var isFullscreen = false
         var posterPath: String?
@@ -198,6 +201,7 @@ final class WallpaperSessionManager {
             waiters.forEach { $0.resume() }
 
         case let .stop(sequence, continuation):
+            Log.session.info("stopping all sessions (\(self.sessions.count))")
             await tearDownEverything()
 
             if let pendingRequest, pendingRequest.sequence <= sequence {
@@ -228,6 +232,11 @@ final class WallpaperSessionManager {
 
     private func apply(_ request: SessionReconcileRequest) async {
         appliedReconcileCount += 1
+        let signpost = Signpost.begin(Signpost.Name.reconcile)
+        defer { Signpost.end(Signpost.Name.reconcile, signpost) }
+        Log.session.debug(
+            "reconcile #\(self.appliedReconcileCount) reason=\(request.reason, privacy: .public) displays=\(request.displays.count) sessions=\(self.sessions.count)"
+        )
 
         let desired = reconciliationPolicy.desiredSessions(
             displays: request.displays,
@@ -292,7 +301,9 @@ final class WallpaperSessionManager {
         }
 
         // 3. Refresh per-session environment from a single window snapshot.
-        let snapshot = environment.captureWindowSnapshot()
+        let snapshot = Signpost.interval(Signpost.Name.windowListQuery) {
+            environment.captureWindowSnapshot()
+        }
         let fullscreenDisplayUUIDs = fullscreenDetector.fullscreenDisplayUUIDs(
             displays: request.displays,
             snapshot: snapshot
@@ -344,10 +355,17 @@ final class WallpaperSessionManager {
         request: SessionReconcileRequest
     ) async {
         for member in members {
-            member.mode = energyPolicy.mode(
+            let decision = energyPolicy.decision(
                 for: systemContext(for: member, group: group, request: request),
                 preferences: request.preferences
             )
+            if decision.mode != member.mode || decision.reason != member.modeReason {
+                Log.energy.info(
+                    "display \(member.session.displayTarget.displayUUID, privacy: .public): \(member.mode.rawValue, privacy: .public) -> \(decision.mode.rawValue, privacy: .public) reason=\(decision.reason.rawValue, privacy: .public) trigger=\(request.reason, privacy: .public)"
+                )
+            }
+            member.mode = decision.mode
+            member.modeReason = decision.reason
         }
 
         let wantsPlayback = members.contains { $0.mode == .animate }
@@ -381,6 +399,9 @@ final class WallpaperSessionManager {
         if group.isPlaying != shouldPlay {
             group.engine.setPlaying(shouldPlay)
             group.isPlaying = shouldPlay
+            Log.playback.info(
+                "asset \(group.asset.id.uuidString, privacy: .public): decoding \(shouldPlay ? "started" : "stopped", privacy: .public) surfaces=\(members.count)"
+            )
         }
 
         if group.isPrepared && !wantsPlayback {
@@ -416,6 +437,16 @@ final class WallpaperSessionManager {
         }
 
         member.session.playbackSource = group.source
+        member.session.modeReason = member.modeReason
+        if group.source == .original || group.asset.optimizedPlayback == nil {
+            member.session.videoPixelSize = group.asset.pixelSize
+            member.session.videoFrameRate = group.asset.frameRate
+            member.session.videoCodec = group.asset.codecType
+        } else if let optimized = group.asset.optimizedPlayback {
+            member.session.videoPixelSize = optimized.pixelSize
+            member.session.videoFrameRate = optimized.frameRate
+            member.session.videoCodec = optimized.codecType
+        }
 
         if windowState == .hidden {
             member.surface.hide()
@@ -432,6 +463,14 @@ final class WallpaperSessionManager {
     // MARK: - Playback lifecycle
 
     private func prepare(_ group: PlaybackGroup, members: [SessionRuntime]) async {
+        let signpost = Signpost.begin(Signpost.Name.preparePlayback)
+        defer {
+            Signpost.end(Signpost.Name.preparePlayback, signpost)
+            Log.playback.info(
+                "asset \(group.asset.id.uuidString, privacy: .public): prepared=\(group.isPrepared) source=\(group.source?.rawValue ?? "none", privacy: .public)"
+            )
+        }
+
         if !group.optimizedUnavailable, let optimizedURL = environment.optimizedPlaybackURL(for: group.asset) {
             do {
                 try await group.engine.prepare(url: optimizedURL, maximumPixelSize: nil, startTime: group.resumeTime)
@@ -440,6 +479,9 @@ final class WallpaperSessionManager {
                 return
             } catch {
                 group.optimizedUnavailable = true
+                Log.playback.error(
+                    "asset \(group.asset.id.uuidString, privacy: .public): optimized rendition failed, falling back to original: \(error.localizedDescription, privacy: .public)"
+                )
             }
         }
 
@@ -449,6 +491,9 @@ final class WallpaperSessionManager {
             authorizedURL = try await permissionStore.resolveBookmark(id: bookmarkID)
         } catch {
             group.prepareFailed = true
+            Log.playback.error(
+                "asset \(group.asset.id.uuidString, privacy: .public): original file is not accessible: \(error.localizedDescription, privacy: .public)"
+            )
             return
         }
 
@@ -467,6 +512,9 @@ final class WallpaperSessionManager {
         } catch {
             await releaseScope(of: group)
             group.prepareFailed = true
+            Log.playback.error(
+                "asset \(group.asset.id.uuidString, privacy: .public): original file failed to play: \(error.localizedDescription, privacy: .public)"
+            )
         }
     }
 
@@ -574,6 +622,7 @@ final class WallpaperSessionManager {
         }
 
         await releasePlayback(of: group)
+        Log.playback.info("asset \(group.asset.id.uuidString, privacy: .public): idle player unloaded")
 
         for member in members {
             updateSessionState(of: member, group: group)

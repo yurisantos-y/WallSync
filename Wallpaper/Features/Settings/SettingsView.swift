@@ -31,6 +31,8 @@ struct SettingsView: View {
             EnergySettingsView()
         case .startup:
             StartupSettingsView()
+        case .diagnostics:
+            DiagnosticsSettingsView()
         }
     }
 }
@@ -41,6 +43,7 @@ enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
     case general
     case energy
     case startup
+    case diagnostics
 
     var id: String { rawValue }
 
@@ -56,6 +59,8 @@ enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
             return "Energia"
         case .startup:
             return "Inicializacao"
+        case .diagnostics:
+            return String(localized: "Diagnostics")
         }
     }
 
@@ -71,6 +76,8 @@ enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
             return "Politicas de bateria, oclusao e fullscreen."
         case .startup:
             return "Controle abertura automatica e login item."
+        case .diagnostics:
+            return String(localized: "Live state of every display.")
         }
     }
 
@@ -86,6 +93,8 @@ enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
             return "bolt"
         case .startup:
             return "power"
+        case .diagnostics:
+            return "stethoscope"
         }
     }
 
@@ -93,7 +102,7 @@ enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .library, .displays:
             return .workspace
-        case .general, .energy, .startup:
+        case .general, .energy, .startup, .diagnostics:
             return .preferences
         }
     }

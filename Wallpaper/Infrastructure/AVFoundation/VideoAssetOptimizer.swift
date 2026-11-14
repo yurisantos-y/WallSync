@@ -58,6 +58,12 @@ actor VideoAssetOptimizer {
             try fileManager.removeItem(at: destination)
         }
 
+        let signpost = Signpost.begin(Signpost.Name.transcode)
+        defer { Signpost.end(Signpost.Name.transcode, signpost) }
+        Log.importing.info(
+            "asset \(assetID.uuidString, privacy: .public): transcoding to \(Int(targetPixelSize.width))x\(Int(targetPixelSize.height)) @ \(targetFrameRate, format: .fixed(precision: 1)) fps, \(Int(targetBitRate / 1000)) kbps"
+        )
+
         try await transcode(
             sourceAsset: sourceAsset,
             videoTrack: videoTrack,
