@@ -53,7 +53,10 @@ actor AssetMetadataLoader {
 
         let codecDescription = capabilityInspector.codecDescription(for: codecType)
         let hardwareDecodeLikely = capabilityInspector.hardwareDecodeLikely(for: codecType)
-        let containerType = url.pathExtension.lowercased()
+        let containerType = ContainerFormatDetector.containerType(
+            header: Self.fileHeader(of: url),
+            fallbackExtension: url.pathExtension
+        )
 
         let playbackProfile = evaluator.profile(
             containerType: containerType,
@@ -77,13 +80,21 @@ actor AssetMetadataLoader {
     }
 }
 
+extension AssetMetadataLoader {
+    static func fileHeader(of url: URL) -> Data {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return Data() }
+        defer { try? handle.close() }
+        return (try? handle.read(upToCount: ContainerFormatDetector.requiredHeaderLength)) ?? Data()
+    }
+}
+
 enum AssetMetadataError: LocalizedError {
     case noVideoTrack
 
     var errorDescription: String? {
         switch self {
         case .noVideoTrack:
-            return "O arquivo selecionado nao contem trilha de video."
+            return String(localized: "The selected file does not contain a video track.")
         }
     }
 }

@@ -1,8 +1,8 @@
 import Foundation
 
 protocol SettingsStoring: Actor {
-    func loadPreferences() throws -> UserPreferences
+    func loadPreferences() -> StoreLoadResult<UserPreferences>
     func savePreferences(_ preferences: UserPreferences) throws
-    func loadPlacements() throws -> [WallpaperPlacement]
+    func loadPlacements() -> StoreLoadResult<[WallpaperPlacement]>
     func savePlacements(_ placements: [WallpaperPlacement]) throws
 }

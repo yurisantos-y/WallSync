@@ -17,16 +17,13 @@ actor VideoAssetOptimizer {
     private let optimizedDirectory: URL
 
     init(
+        storage: StorageLocations,
         fileManager: FileManager = .default,
         capabilityInspector: VideoCapabilityInspector = VideoCapabilityInspector()
     ) {
         self.fileManager = fileManager
         self.capabilityInspector = capabilityInspector
-        let supportDirectory = try! fileManager.wallpaperApplicationSupportDirectory()
-        self.optimizedDirectory = supportDirectory.appendingPathComponent(Constant.optimizedDirectoryName, isDirectory: true)
-        if !fileManager.fileExists(atPath: optimizedDirectory.path) {
-            try? fileManager.createDirectory(at: optimizedDirectory, withIntermediateDirectories: true)
-        }
+        self.optimizedDirectory = storage.optimizedDirectory
     }
 
     func optimize(

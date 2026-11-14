@@ -41,13 +41,16 @@ final class NativeDesktopPictureManager {
 
     private let workspace: NSWorkspace
     private let fileManager: FileManager
+    private let storage: StorageLocations
     private let reconciliationPolicy = SessionReconciliationPolicy()
     private var lastAppliedAssignments: [String: AppliedAssignment] = [:]
 
     init(
+        storage: StorageLocations,
         workspace: NSWorkspace = .shared,
         fileManager: FileManager = .default
     ) {
+        self.storage = storage
         self.workspace = workspace
         self.fileManager = fileManager
     }
@@ -57,7 +60,6 @@ final class NativeDesktopPictureManager {
         assets: [WallpaperAsset],
         placements: [WallpaperPlacement]
     ) throws {
-        let supportDirectory = try fileManager.wallpaperApplicationSupportDirectory()
         let assignments = Self.desiredAssignments(
             displays: displays,
             assets: assets,
@@ -70,7 +72,7 @@ final class NativeDesktopPictureManager {
         for assignment in assignments {
             guard let screen = Self.screen(matching: assignment.cgDisplayID) else { continue }
 
-            let posterURL = supportDirectory.appendingPathComponent(assignment.posterImageRelativePath)
+            let posterURL = storage.url(forRelativePath: assignment.posterImageRelativePath)
             guard fileManager.fileExists(atPath: posterURL.path) else { continue }
 
             let appliedAssignment = AppliedAssignment(
@@ -146,7 +148,7 @@ enum NativeDesktopPictureError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .failedToApplyWallpaper:
-            return "Nao foi possivel atualizar o wallpaper estatico do macOS."
+            return String(localized: "The static macOS wallpaper could not be updated.")
         }
     }
 }

@@ -2,13 +2,12 @@ import AppKit
 import Foundation
 
 @MainActor
-final class DesktopWallpaperWindowController: NSWindowController {
-    var displayTarget: DisplayTarget
+final class DesktopWallpaperWindowController: NSWindowController, WallpaperSurface {
+    private(set) var displayTarget: DisplayTarget
     let hostView: WallpaperHostView
-    var onOcclusionChange: ((Bool) -> Void)?
+    var onOcclusionChange: (() -> Void)?
 
     private let occlusionObserver = OcclusionObserver()
-    private let displayOcclusionDetector = DisplayOcclusionDetector()
     private var isWindowVisible = false
 
     init(displayTarget: DisplayTarget) {
@@ -19,11 +18,9 @@ final class DesktopWallpaperWindowController: NSWindowController {
 
         window.contentView = hostView
         window.setFrame(displayTarget.frame, display: true)
-        show()
 
         occlusionObserver.startObserving(window: window) { [weak self] _ in
-            guard let self else { return }
-            self.onOcclusionChange?(self.isOccluded)
+            self?.onOcclusionChange?()
         }
     }
 
@@ -32,11 +29,13 @@ final class DesktopWallpaperWindowController: NSWindowController {
     }
 
     var isOccluded: Bool {
+        // A window we ordered out ourselves says nothing about what covers
+        // the desktop; only the display coverage counts then.
         guard let window else { return true }
-        return !window.occlusionState.contains(.visible) || displayOcclusionDetector.isDisplayCovered(displayTarget)
+        return isWindowVisible && !window.occlusionState.contains(.visible)
     }
 
-    func updateDisplayTarget(_ target: DisplayTarget) {
+    func update(displayTarget target: DisplayTarget) {
         guard displayTarget != target else { return }
         displayTarget = target
 
@@ -48,8 +47,22 @@ final class DesktopWallpaperWindowController: NSWindowController {
         if window?.frame != target.frame {
             window?.setFrame(target.frame, display: false, animate: false)
         }
+    }
 
-        onOcclusionChange?(isOccluded)
+    func setContentMode(_ contentMode: WallpaperPlacement.ContentMode) {
+        hostView.setContentMode(contentMode)
+    }
+
+    func setPoster(_ image: CGImage?) {
+        hostView.setPoster(image)
+    }
+
+    func showPoster() {
+        hostView.setVideoVisible(false)
+    }
+
+    func showVideo() {
+        hostView.setVideoVisible(true)
     }
 
     func show() {
@@ -64,9 +77,11 @@ final class DesktopWallpaperWindowController: NSWindowController {
         window?.orderOut(nil)
     }
 
-    func closeWindow() {
+    override func close() {
         occlusionObserver.invalidate()
+        onOcclusionChange = nil
+        hostView.setPlayer(nil)
         hide()
-        close()
+        super.close()
     }
 }

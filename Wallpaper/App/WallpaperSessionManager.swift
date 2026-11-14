@@ -1,405 +1,631 @@
-import AppKit
+import CoreGraphics
 import Foundation
 
+/// The complete desired state handed to the session manager. A newer request
+/// always supersedes an older one that has not been applied yet.
+struct SessionReconcileRequest: Sendable {
+    var displays: [DisplayTarget]
+    var assets: [WallpaperAsset]
+    var placements: [WallpaperPlacement]
+    var preferences: UserPreferences
+    var runtimeState: AppRuntimeState
+}
+
+/// Owns every wallpaper window and playback engine.
+///
+/// All mutations go through a single command queue consumed by one task, so a
+/// command always runs to completion before the next one starts. That removes
+/// the copy / await / write-back races of the previous design: there is no way
+/// for two reconciles (or a reconcile and an occlusion change) to interleave
+/// and leave an orphaned window, player or security scope behind.
 @MainActor
 final class WallpaperSessionManager {
-    private enum PreparedPlaybackSource {
-        case optimized
-        case original
-    }
-
-    private struct SessionRuntime {
+    private final class SessionRuntime {
         var session: RenderSession
         var asset: WallpaperAsset
         var placement: WallpaperPlacement
-        let windowController: DesktopWallpaperWindowController
-        let playbackController: AVPlayerPlaybackController
-        var isOccluded: Bool
-        var isFullscreen: Bool
-        var isPrepared: Bool
-        var hasAccessScope: Bool
-        var preparedPlaybackSource: PreparedPlaybackSource?
-        var optimizedPlaybackUnavailable: Bool
-        var teardownTask: Task<Void, Never>?
+        let surface: any WallpaperSurface
+        var mode: SessionMode = .suspend
+        var isOccluded = false
+        var isFullscreen = false
+        var posterPath: String?
+        var isAttached = false
+
+        init(session: RenderSession, asset: WallpaperAsset, placement: WallpaperPlacement, surface: any WallpaperSurface) {
+            self.session = session
+            self.asset = asset
+            self.placement = placement
+            self.surface = surface
+            self.posterPath = asset.posterImageRelativePath
+        }
     }
 
-    private let permissionStore: FilePermissionStore
-    private let posterCacheStore: PosterCacheStore
+    /// One decode pipeline, shared by every session that shows the same video.
+    private final class PlaybackGroup {
+        let key: String
+        var asset: WallpaperAsset
+        let engine: any SharedPlaybackEngine
+        var isPrepared = false
+        var isPlaying = false
+        var source: RenderSession.PlaybackSource?
+        var scopedBookmarkID: UUID?
+        var optimizedUnavailable = false
+        var prepareFailed = false
+        var resumeTime: TimeInterval = 0
+        var unloadTask: Task<Void, Never>?
+        var unloadToken = 0
+
+        init(key: String, asset: WallpaperAsset, engine: any SharedPlaybackEngine) {
+            self.key = key
+            self.asset = asset
+            self.engine = engine
+        }
+    }
+
+    private enum Command {
+        case apply
+        case stop(sequence: Int, CheckedContinuation<Void, Never>)
+        case unload(groupKey: String, token: Int)
+        case barrier(CheckedContinuation<Void, Never>)
+    }
+
+    private let environment: any SessionEnvironment
+    private let permissionStore: any PermissionStoring
     private let energyPolicy: EnergyPolicyController
+    private let sleep: @Sendable (Duration) async -> Void
     private let reconciliationPolicy = SessionReconciliationPolicy()
     private let playbackEvaluator = PlaybackEligibilityEvaluator()
+    private let occlusionDetector = DisplayOcclusionDetector()
+    private let fullscreenDetector = FullscreenWindowDetector()
+    private var lastFullscreenDisplayUUIDs: Set<String> = []
 
     private var sessions: [String: SessionRuntime] = [:]
-    private var currentPreferences = UserPreferences.defaultValue
-    private var currentRuntimeState = AppRuntimeState.initial
+    private var groups: [String: PlaybackGroup] = [:]
+
+    private let commandContinuation: AsyncStream<Command>.Continuation
+    private var worker: Task<Void, Never>?
+
+    private var requestSequence = 0
+    private var pendingRequest: (request: SessionReconcileRequest, sequence: Int)?
+    private var activeRequest: (request: SessionReconcileRequest, sequence: Int)?
+    private var applyQueued = false
+    private var applyWaiters: [CheckedContinuation<Void, Never>] = []
+
+    /// Number of reconcile passes actually executed; lets tests verify coalescing.
+    private(set) var appliedReconcileCount = 0
 
     var onSessionsChanged: (([RenderSession]) -> Void)?
+    /// Reports which displays are covered by a fullscreen window, as seen by
+    /// the most recent reconcile.
+    var onFullscreenDisplaysChanged: ((Set<String>) -> Void)?
 
     init(
-        permissionStore: FilePermissionStore,
-        posterCacheStore: PosterCacheStore,
-        energyPolicy: EnergyPolicyController
+        environment: any SessionEnvironment,
+        permissionStore: any PermissionStoring,
+        energyPolicy: EnergyPolicyController,
+        sleep: @escaping @Sendable (Duration) async -> Void = { try? await Task.sleep(for: $0) }
     ) {
+        self.environment = environment
         self.permissionStore = permissionStore
-        self.posterCacheStore = posterCacheStore
         self.energyPolicy = energyPolicy
-    }
+        self.sleep = sleep
 
-    func reconcile(
-        displays: [DisplayTarget],
-        assets: [WallpaperAsset],
-        placements: [WallpaperPlacement],
-        preferences: UserPreferences,
-        runtimeState: AppRuntimeState
-    ) async {
-        currentPreferences = preferences
-        currentRuntimeState = runtimeState
-
-        let desiredSessions = reconciliationPolicy.desiredSessions(
-            displays: displays,
-            assets: assets,
-            placements: placements
-        )
-
-        let desiredDisplayIDs = Set(desiredSessions.map(\.display.displayUUID))
-        let existingDisplayIDs = Set(sessions.keys)
-
-        for removedDisplayID in existingDisplayIDs.subtracting(desiredDisplayIDs) {
-            await tearDownSession(for: removedDisplayID)
-        }
-
-        for desired in desiredSessions {
-            guard desired.asset.eligibility.tier != .unsupported else {
-                continue
-            }
-
-            if let existing = sessions[desired.display.displayUUID],
-               existing.session.assetID == desired.asset.id {
-                await update(existingDisplayID: desired.display.displayUUID, with: desired)
-            } else {
-                await replaceSession(with: desired)
+        let (stream, continuation) = AsyncStream.makeStream(of: Command.self)
+        commandContinuation = continuation
+        worker = Task { [weak self] in
+            for await command in stream {
+                guard let self else { return }
+                await self.process(command)
             }
         }
-
-        publishSessions()
     }
 
-    func stopAll() {
-        let displayIDs = Array(sessions.keys)
-        Task {
-            for displayID in displayIDs {
-                await tearDownSession(for: displayID)
+    deinit {
+        commandContinuation.finish()
+        worker?.cancel()
+    }
+
+    // MARK: - Public API
+
+    /// Records the desired state and returns immediately. If several requests
+    /// arrive while a reconcile is running, only the most recent is applied.
+    func submit(_ request: SessionReconcileRequest) {
+        requestSequence += 1
+        pendingRequest = (request, requestSequence)
+        enqueueApply()
+    }
+
+    /// Same as `submit`, but returns once a reconcile that includes this
+    /// request (or a newer one) has finished.
+    func reconcile(_ request: SessionReconcileRequest) async {
+        requestSequence += 1
+        pendingRequest = (request, requestSequence)
+        await withCheckedContinuation { continuation in
+            applyWaiters.append(continuation)
+            enqueueApply()
+        }
+    }
+
+    /// Tears down every window and player. Returns when cleanup has finished,
+    /// so termination can wait for it.
+    func stopAll() async {
+        let sequence = requestSequence
+        // A request submitted after this point needs its own apply token,
+        // queued behind the stop.
+        applyQueued = false
+        await withCheckedContinuation { continuation in
+            commandContinuation.yield(.stop(sequence: sequence, continuation))
+        }
+    }
+
+    /// Returns once every command enqueued so far has been processed.
+    func waitUntilIdle() async {
+        await withCheckedContinuation { continuation in
+            commandContinuation.yield(.barrier(continuation))
+        }
+    }
+
+    var currentSessions: [RenderSession] {
+        sessions.values.map(\.session).sorted { lhs, rhs in
+            lhs.displayTarget.localizedName == rhs.displayTarget.localizedName
+                ? lhs.displayTarget.displayUUID < rhs.displayTarget.displayUUID
+                : lhs.displayTarget.localizedName < rhs.displayTarget.localizedName
+        }
+    }
+
+    // MARK: - Command loop
+
+    private func enqueueApply() {
+        guard !applyQueued else { return }
+        applyQueued = true
+        commandContinuation.yield(.apply)
+    }
+
+    private func process(_ command: Command) async {
+        switch command {
+        case .apply:
+            applyQueued = false
+            let waiters = applyWaiters
+            applyWaiters = []
+
+            if let pendingRequest {
+                activeRequest = pendingRequest
+                self.pendingRequest = nil
             }
+            if let activeRequest {
+                await apply(activeRequest.request)
+            }
+            waiters.forEach { $0.resume() }
+
+        case let .stop(sequence, continuation):
+            await tearDownEverything()
+
+            if let pendingRequest, pendingRequest.sequence <= sequence {
+                self.pendingRequest = nil
+            }
+            if let activeRequest {
+                if activeRequest.sequence > sequence {
+                    // Submitted after `stopAll()` was called but applied before
+                    // the stop ran: it must win.
+                    if pendingRequest == nil { pendingRequest = activeRequest }
+                    enqueueApply()
+                }
+                self.activeRequest = nil
+            }
+
             publishSessions()
+            continuation.resume()
+
+        case let .unload(groupKey, token):
+            await unloadIdlePlayback(groupKey: groupKey, token: token)
+
+        case let .barrier(continuation):
+            continuation.resume()
         }
     }
 
-    private func update(existingDisplayID: String, with desired: DesiredWallpaperSession) async {
-        guard var runtime = sessions[existingDisplayID] else { return }
+    // MARK: - Reconcile
 
-        if runtime.asset.optimizedPlayback != desired.asset.optimizedPlayback {
-            runtime.optimizedPlaybackUnavailable = false
-        }
-        runtime.asset = desired.asset
-        runtime.placement = desired.placement
-        runtime.isFullscreen = currentRuntimeState.fullscreenDisplayUUIDs.contains(desired.display.displayUUID)
-        runtime.windowController.updateDisplayTarget(desired.display)
-        runtime.playbackController.setContentMode(desired.placement.contentMode)
-        runtime.session.displayTarget = desired.display
+    private func apply(_ request: SessionReconcileRequest) async {
+        appliedReconcileCount += 1
 
-        await applyPolicy(to: &runtime)
-        sessions[existingDisplayID] = runtime
-    }
+        let desired = reconciliationPolicy.desiredSessions(
+            displays: request.displays,
+            assets: request.assets,
+            placements: request.placements
+        ).filter { playbackEvaluator.effectiveProfile(for: $0.asset).tier != .unsupported }
 
-    private func replaceSession(with desired: DesiredWallpaperSession) async {
-        await tearDownSession(for: desired.display.displayUUID)
-
-        let poster = await posterCacheStore.loadPoster(relativePath: desired.asset.posterImageRelativePath)
-
-        let windowController = DesktopWallpaperWindowController(displayTarget: desired.display)
-        let playbackController = AVPlayerPlaybackController(posterImage: poster)
-        playbackController.attach(to: windowController.hostView, contentMode: desired.placement.contentMode)
-
-        var runtime = SessionRuntime(
-            session: RenderSession(
-                id: UUID(),
-                displayTarget: desired.display,
-                assetID: desired.asset.id,
-                windowState: .visible,
-                playbackState: .preparing,
-                energyMode: .animate,
-                startedAt: .now,
-                lastVisibilityChange: .now
-            ),
-            asset: desired.asset,
-            placement: desired.placement,
-            windowController: windowController,
-            playbackController: playbackController,
-            isOccluded: windowController.isOccluded,
-            isFullscreen: currentRuntimeState.fullscreenDisplayUUIDs.contains(desired.display.displayUUID),
-            isPrepared: false,
-            hasAccessScope: false,
-            preparedPlaybackSource: nil,
-            optimizedPlaybackUnavailable: false,
-            teardownTask: nil
+        let desiredByDisplay = Dictionary(
+            desired.map { ($0.display.displayUUID, $0) },
+            uniquingKeysWith: { first, _ in first }
         )
 
-        windowController.onOcclusionChange = { [weak self] isOccluded in
-            guard let self else { return }
-            Task { @MainActor in
-                await self.handleOcclusionChange(for: desired.display.displayUUID, isOccluded: isOccluded)
+        // 1. Remove sessions whose display is gone or whose asset changed.
+        for displayID in Array(sessions.keys) {
+            guard let runtime = sessions[displayID] else { continue }
+            if desiredByDisplay[displayID]?.asset.id != runtime.asset.id {
+                removeSession(displayID)
             }
         }
 
-        await applyPolicy(to: &runtime)
-        sessions[desired.display.displayUUID] = runtime
-    }
+        // 2. Create missing sessions, refresh existing ones.
+        for item in desired {
+            let displayID = item.display.displayUUID
 
-    private func tearDownSession(for displayID: String) async {
-        guard var runtime = sessions.removeValue(forKey: displayID) else { return }
+            if let runtime = sessions[displayID] {
+                runtime.asset = item.asset
+                runtime.placement = item.placement
+                runtime.session.displayTarget = item.display
+                runtime.surface.update(displayTarget: item.display)
+                runtime.surface.setContentMode(item.placement.contentMode)
 
-        runtime.teardownTask?.cancel()
-        await teardownPlayback(for: &runtime, reason: "session_removed")
-        runtime.windowController.closeWindow()
-    }
+                if runtime.posterPath != item.asset.posterImageRelativePath {
+                    runtime.posterPath = item.asset.posterImageRelativePath
+                    runtime.surface.setPoster(await environment.loadPoster(relativePath: runtime.posterPath))
+                }
+            } else {
+                let poster = await environment.loadPoster(relativePath: item.asset.posterImageRelativePath)
+                let surface = environment.makeSurface(for: item.display)
+                surface.setContentMode(item.placement.contentMode)
+                surface.setPoster(poster)
+                surface.showPoster()
+                surface.onOcclusionChange = { [weak self] in
+                    self?.enqueueApply()
+                }
 
-    private func handleOcclusionChange(for displayID: String, isOccluded: Bool) async {
-        guard var runtime = sessions[displayID] else { return }
-        guard runtime.isOccluded != isOccluded else { return }
-        runtime.isOccluded = isOccluded
-        runtime.session.lastVisibilityChange = .now
-        runtime.session.windowState = isOccluded ? .suspended : .visible
-        await applyPolicy(to: &runtime)
-        sessions[displayID] = runtime
+                sessions[displayID] = SessionRuntime(
+                    session: RenderSession(
+                        id: UUID(),
+                        displayTarget: item.display,
+                        assetID: item.asset.id,
+                        windowState: .visible,
+                        playbackState: .idle,
+                        energyMode: .suspend,
+                        startedAt: .now,
+                        lastVisibilityChange: .now
+                    ),
+                    asset: item.asset,
+                    placement: item.placement,
+                    surface: surface
+                )
+            }
+        }
+
+        // 3. Refresh per-session environment from a single window snapshot.
+        let snapshot = environment.captureWindowSnapshot()
+        let fullscreenDisplayUUIDs = fullscreenDetector.fullscreenDisplayUUIDs(
+            displays: request.displays,
+            snapshot: snapshot
+        )
+        if fullscreenDisplayUUIDs != lastFullscreenDisplayUUIDs {
+            lastFullscreenDisplayUUIDs = fullscreenDisplayUUIDs
+            onFullscreenDisplaysChanged?(fullscreenDisplayUUIDs)
+        }
+
+        for (displayID, runtime) in sessions {
+            runtime.isFullscreen = fullscreenDisplayUUIDs.contains(displayID)
+            runtime.isOccluded = runtime.surface.isOccluded
+                || occlusionDetector.isDisplayCovered(runtime.session.displayTarget, snapshot: snapshot)
+        }
+
+        // 4. Rebuild playback groups.
+        var membership: [String: [SessionRuntime]] = [:]
+        for runtime in sessions.values {
+            membership[groupKey(for: runtime), default: []].append(runtime)
+        }
+
+        for key in Array(groups.keys) where membership[key] == nil {
+            await tearDownGroup(key)
+        }
+
+        for key in membership.keys.sorted() {
+            guard let members = membership[key], let first = members.first else { continue }
+            let group = groups[key] ?? {
+                let created = PlaybackGroup(key: key, asset: first.asset, engine: environment.makeEngine())
+                groups[key] = created
+                return created
+            }()
+
+            if group.asset.optimizedPlayback != first.asset.optimizedPlayback {
+                group.optimizedUnavailable = false
+                group.prepareFailed = false
+            }
+            group.asset = first.asset
+
+            await applyPolicy(to: group, members: members, request: request)
+        }
+
         publishSessions()
     }
 
-    private func applyPolicy(to runtime: inout SessionRuntime) async {
-        runtime.isFullscreen = currentRuntimeState.fullscreenDisplayUUIDs.contains(runtime.session.displayTarget.displayUUID)
-        runtime.isOccluded = runtime.windowController.isOccluded
-        runtime.session.displayTarget = runtime.windowController.displayTarget
+    private func applyPolicy(
+        to group: PlaybackGroup,
+        members: [SessionRuntime],
+        request: SessionReconcileRequest
+    ) async {
+        for member in members {
+            member.mode = energyPolicy.mode(
+                for: systemContext(for: member, group: group, request: request),
+                preferences: request.preferences
+            )
+        }
 
-        let context = systemContext(for: runtime)
-        let mode = energyPolicy.mode(for: context, preferences: currentPreferences)
+        let wantsPlayback = members.contains { $0.mode == .animate }
 
-        switch mode {
-        case .animate:
-            cancelDeferredTeardown(for: &runtime)
+        if wantsPlayback {
+            cancelUnload(for: group)
 
-            do {
-                try await ensurePlaybackPrepared(for: &runtime)
-                if energyPolicy.mode(for: systemContext(for: runtime), preferences: currentPreferences) != .animate {
-                    await applyPolicy(to: &runtime)
-                    return
+            if !group.isPrepared && !group.prepareFailed {
+                for member in members where member.mode == .animate {
+                    member.session.playbackState = .preparing
                 }
-                if runtime.session.playbackState != .animating {
-                    runtime.playbackController.play()
+                publishSessions()
+                await prepare(group, members: members)
+            }
+        }
+
+        for member in members {
+            if group.isPrepared {
+                if !member.isAttached {
+                    group.engine.attach(member.surface)
+                    member.isAttached = true
                 }
-                if runtime.session.windowState != .visible {
-                    runtime.windowController.show()
-                    runtime.session.lastVisibilityChange = .now
-                }
-                runtime.session.playbackState = .animating
-                runtime.session.windowState = .visible
-                runtime.session.energyMode = .animate
-            } catch {
-                runtime.playbackController.showPoster()
-                if runtime.session.windowState != .visible {
-                    runtime.windowController.show()
-                    runtime.session.lastVisibilityChange = .now
-                }
-                runtime.session.playbackState = .failed
-                runtime.session.windowState = .visible
-                runtime.session.energyMode = .poster
+                group.engine.setLive(member.mode == .animate, for: member.surface)
+                member.surface.showVideo()
+            } else {
+                member.surface.showPoster()
             }
-        case .poster:
-            if runtime.session.playbackState != .poster || runtime.session.energyMode != .poster {
-                runtime.playbackController.showPoster()
-            }
-            if runtime.session.windowState != .visible {
-                runtime.windowController.show()
-                runtime.session.lastVisibilityChange = .now
-            }
-            runtime.session.playbackState = .poster
-            runtime.session.windowState = .visible
-            runtime.session.energyMode = .poster
-            schedulePlaybackUnloadIfNeeded(for: &runtime, mode: .poster, context: context)
-        case .suspend:
-            runtime.playbackController.pause()
-            runtime.playbackController.showPoster()
-            runtime.session.playbackState = runtime.isPrepared ? .paused : .idle
+        }
 
-            let nextWindowState: RenderSession.WindowState = runtime.isFullscreen ? .hidden : .suspended
-            if runtime.session.windowState != nextWindowState {
-                runtime.session.lastVisibilityChange = .now
-            }
+        let shouldPlay = wantsPlayback && group.isPrepared
+        if group.isPlaying != shouldPlay {
+            group.engine.setPlaying(shouldPlay)
+            group.isPlaying = shouldPlay
+        }
 
-            switch nextWindowState {
-            case .visible:
-                runtime.windowController.show()
-            case .hidden:
-                runtime.windowController.hide()
-            case .suspended:
-                runtime.windowController.show()
-            }
+        if group.isPrepared && !wantsPlayback {
+            scheduleUnloadIfNeeded(for: group, members: members, request: request)
+        }
 
-            runtime.session.windowState = nextWindowState
-            runtime.session.energyMode = .suspend
-
-            schedulePlaybackUnloadIfNeeded(for: &runtime, mode: .suspend, context: context)
+        for member in members {
+            updateSessionState(of: member, group: group)
         }
     }
 
-    private func ensurePlaybackPrepared(for runtime: inout SessionRuntime) async throws {
-        guard !runtime.isPrepared else { return }
+    private func updateSessionState(of member: SessionRuntime, group: PlaybackGroup) {
+        let windowState: RenderSession.WindowState
 
-        if !runtime.optimizedPlaybackUnavailable,
-           let optimizedURL = optimizedPlaybackURL(for: runtime.asset) {
+        switch member.mode {
+        case .animate:
+            if group.isPrepared {
+                member.session.playbackState = .animating
+                member.session.energyMode = .animate
+            } else {
+                member.session.playbackState = .failed
+                member.session.energyMode = .poster
+            }
+            windowState = .visible
+        case .poster:
+            member.session.playbackState = .poster
+            member.session.energyMode = .poster
+            windowState = .visible
+        case .suspend:
+            member.session.playbackState = group.isPrepared ? .paused : .idle
+            member.session.energyMode = .suspend
+            windowState = member.isFullscreen ? .hidden : .suspended
+        }
+
+        member.session.playbackSource = group.source
+
+        if windowState == .hidden {
+            member.surface.hide()
+        } else {
+            member.surface.show()
+        }
+
+        if member.session.windowState != windowState {
+            member.session.windowState = windowState
+            member.session.lastVisibilityChange = .now
+        }
+    }
+
+    // MARK: - Playback lifecycle
+
+    private func prepare(_ group: PlaybackGroup, members: [SessionRuntime]) async {
+        if !group.optimizedUnavailable, let optimizedURL = environment.optimizedPlaybackURL(for: group.asset) {
             do {
-                try await runtime.playbackController.prepare(with: optimizedURL)
-                runtime.playbackController.attach(to: runtime.windowController.hostView, contentMode: runtime.placement.contentMode)
-                runtime.isPrepared = true
-                runtime.preparedPlaybackSource = .optimized
-                runtime.session.playbackState = .preparing
+                try await group.engine.prepare(url: optimizedURL, maximumPixelSize: nil, startTime: group.resumeTime)
+                group.isPrepared = true
+                group.source = .optimized
                 return
             } catch {
-                runtime.optimizedPlaybackUnavailable = true
+                group.optimizedUnavailable = true
             }
         }
 
-        let authorizedURL = try await permissionStore.resolveBookmark(id: runtime.asset.originalBookmarkID)
-        runtime.hasAccessScope = true
+        let bookmarkID = group.asset.originalBookmarkID
+        let authorizedURL: URL
+        do {
+            authorizedURL = try await permissionStore.resolveBookmark(id: bookmarkID)
+        } catch {
+            group.prepareFailed = true
+            return
+        }
+
+        // The scope is held from here; every exit below either keeps it
+        // recorded on the group or releases it.
+        group.scopedBookmarkID = bookmarkID
 
         do {
-            try await runtime.playbackController.prepare(with: authorizedURL)
-            runtime.playbackController.attach(to: runtime.windowController.hostView, contentMode: runtime.placement.contentMode)
-            runtime.isPrepared = true
-            runtime.preparedPlaybackSource = .original
-            runtime.session.playbackState = .preparing
+            try await group.engine.prepare(
+                url: authorizedURL,
+                maximumPixelSize: Self.largestPixelSize(of: members),
+                startTime: group.resumeTime
+            )
+            group.isPrepared = true
+            group.source = .original
         } catch {
-            if runtime.hasAccessScope {
-                await permissionStore.stopAccess(for: runtime.asset.originalBookmarkID)
-                runtime.hasAccessScope = false
-            }
-            throw error
+            await releaseScope(of: group)
+            group.prepareFailed = true
         }
     }
 
-    private func teardownPlayback(for runtime: inout SessionRuntime, reason: String) async {
-        runtime.playbackController.teardown()
-        runtime.isPrepared = false
-        runtime.preparedPlaybackSource = nil
+    private func releaseScope(of group: PlaybackGroup) async {
+        guard let bookmarkID = group.scopedBookmarkID else { return }
+        group.scopedBookmarkID = nil
+        await permissionStore.stopAccess(for: bookmarkID)
+    }
 
-        if runtime.hasAccessScope {
-            await permissionStore.stopAccess(for: runtime.asset.originalBookmarkID)
-            runtime.hasAccessScope = false
+    private func releasePlayback(of group: PlaybackGroup) async {
+        cancelUnload(for: group)
+        group.engine.teardown()
+        group.isPrepared = false
+        group.isPlaying = false
+        group.source = nil
+        await releaseScope(of: group)
+    }
+
+    private func tearDownGroup(_ key: String) async {
+        guard let group = groups.removeValue(forKey: key) else { return }
+        await releasePlayback(of: group)
+    }
+
+    private func removeSession(_ displayID: String) {
+        guard let runtime = sessions.removeValue(forKey: displayID) else { return }
+        if runtime.isAttached, let group = groups[groupKey(for: runtime)] {
+            group.engine.detach(runtime.surface)
         }
+        runtime.surface.onOcclusionChange = nil
+        runtime.surface.close()
+    }
 
-        if runtime.session.playbackState != .failed {
-            runtime.session.playbackState = .idle
+    private func tearDownEverything() async {
+        for displayID in Array(sessions.keys) {
+            removeSession(displayID)
+        }
+        for key in Array(groups.keys) {
+            await tearDownGroup(key)
         }
     }
 
-    private func cancelDeferredTeardown(for runtime: inout SessionRuntime) {
-        runtime.teardownTask?.cancel()
-        runtime.teardownTask = nil
-    }
+    // MARK: - Deferred unload
 
-    private func scheduleDeferredTeardown(for runtime: inout SessionRuntime, after delay: Duration) {
-        cancelDeferredTeardown(for: &runtime)
-        let displayID = runtime.session.displayTarget.displayUUID
+    private func scheduleUnloadIfNeeded(
+        for group: PlaybackGroup,
+        members: [SessionRuntime],
+        request: SessionReconcileRequest
+    ) {
+        let gracePeriods = members.compactMap { member in
+            energyPolicy.playbackUnloadGracePeriod(
+                for: member.mode,
+                context: systemContext(for: member, group: group, request: request),
+                preferences: request.preferences
+            )
+        }
 
-        runtime.teardownTask = Task { [weak self] in
-            try? await Task.sleep(for: delay)
+        // Unload only when no member needs the pipeline kept warm.
+        guard gracePeriods.count == members.count, let gracePeriod = gracePeriods.max() else {
+            cancelUnload(for: group)
+            return
+        }
+
+        // Already counting down: periodic re-evaluations must not restart it.
+        guard group.unloadTask == nil else { return }
+
+        group.unloadToken += 1
+        let token = group.unloadToken
+        let key = group.key
+        let continuation = commandContinuation
+        let sleep = self.sleep
+
+        group.unloadTask = Task {
+            await sleep(gracePeriod)
             guard !Task.isCancelled else { return }
-            await self?.executeDeferredTeardown(for: displayID)
+            continuation.yield(.unload(groupKey: key, token: token))
         }
     }
 
-    private func executeDeferredTeardown(for displayID: String) async {
-        guard var runtime = sessions[displayID] else { return }
-        runtime.teardownTask = nil
+    private func cancelUnload(for group: PlaybackGroup) {
+        group.unloadTask?.cancel()
+        group.unloadTask = nil
+        group.unloadToken += 1
+    }
 
-        guard runtime.session.energyMode == .poster || runtime.session.energyMode == .suspend,
-              runtime.isPrepared else {
-            sessions[displayID] = runtime
-            return
+    private func unloadIdlePlayback(groupKey: String, token: Int) async {
+        guard let group = groups[groupKey], group.unloadToken == token else { return }
+        group.unloadTask = nil
+        guard group.isPrepared, !group.isPlaying else { return }
+
+        let members = sessions.values.filter { self.groupKey(for: $0) == groupKey }
+
+        // Keep the frame the user was looking at, and resume from it later.
+        group.resumeTime = group.engine.currentTime
+        let frozenFrame = await group.engine.snapshotCurrentFrame()
+
+        for member in members {
+            if let frozenFrame {
+                member.surface.setPoster(frozenFrame)
+            }
+            member.surface.showPoster()
+            if member.isAttached {
+                group.engine.detach(member.surface)
+                member.isAttached = false
+            }
         }
 
-        let mode = SessionMode(rawValue: runtime.session.energyMode.rawValue) ?? .suspend
-        let context = systemContext(for: runtime)
-        guard energyPolicy.shouldUnloadPlayback(for: mode, context: context, preferences: currentPreferences) else {
-            sessions[displayID] = runtime
-            return
-        }
+        await releasePlayback(of: group)
 
-        await teardownPlayback(for: &runtime, reason: "invisible_grace_elapsed")
-        sessions[displayID] = runtime
+        for member in members {
+            updateSessionState(of: member, group: group)
+        }
         publishSessions()
     }
 
+    // MARK: - Helpers
+
     private func publishSessions() {
-        onSessionsChanged?(sessions.values.map(\.session).sorted { $0.displayTarget.localizedName < $1.displayTarget.localizedName })
+        onSessionsChanged?(currentSessions)
     }
 
-    private func schedulePlaybackUnloadIfNeeded(
-        for runtime: inout SessionRuntime,
-        mode: SessionMode,
-        context: SystemContext
-    ) {
-        guard runtime.isPrepared,
-              let gracePeriod = energyPolicy.playbackUnloadGracePeriod(
-                for: mode,
-                context: context,
-                preferences: currentPreferences
-              ) else {
-            cancelDeferredTeardown(for: &runtime)
-            return
-        }
-
-        scheduleDeferredTeardown(for: &runtime, after: gracePeriod)
+    /// Sessions with the same key share one playback engine. The key always
+    /// contains the asset, so a group can never outlive an asset change.
+    private func groupKey(for runtime: SessionRuntime) -> String {
+        "\(runtime.asset.id.uuidString)|\(runtime.session.displayTarget.displayUUID)"
     }
 
-    private func systemContext(for runtime: SessionRuntime) -> SystemContext {
+    private static func largestPixelSize(of members: [SessionRuntime]) -> CGSize? {
+        members
+            .map { member -> CGSize in
+                let target = member.session.displayTarget
+                return CGSize(
+                    width: target.frame.width * target.backingScaleFactor,
+                    height: target.frame.height * target.backingScaleFactor
+                )
+            }
+            .max { $0.width * $0.height < $1.width * $1.height }
+    }
+
+    private func systemContext(
+        for runtime: SessionRuntime,
+        group: PlaybackGroup,
+        request: SessionReconcileRequest
+    ) -> SystemContext {
         SystemContext(
-            onBattery: currentRuntimeState.powerSource == .battery,
-            lowPowerMode: currentRuntimeState.lowPowerMode,
-            thermalState: currentRuntimeState.thermalState,
+            onBattery: request.runtimeState.powerSource == .battery,
+            lowPowerMode: request.runtimeState.lowPowerMode,
+            thermalState: request.runtimeState.thermalState,
             isOccluded: runtime.isOccluded,
             isFullscreen: runtime.isFullscreen,
-            assetIsHeavy: effectivePlaybackIsHeavy(for: runtime),
+            assetIsHeavy: effectivePlaybackIsHeavy(for: group),
             isPrimaryDisplay: runtime.session.displayTarget.isPrimary,
-            activeDisplayCount: currentRuntimeState.activeDisplays.count
+            activeDisplayCount: request.displays.count
         )
     }
 
-    private func effectivePlaybackIsHeavy(for runtime: SessionRuntime) -> Bool {
-        if runtime.preparedPlaybackSource == .original || runtime.optimizedPlaybackUnavailable {
-            return runtime.asset.eligibility.isHeavy
+    private func effectivePlaybackIsHeavy(for group: PlaybackGroup) -> Bool {
+        if group.source == .original || group.optimizedUnavailable {
+            return group.asset.eligibility.isHeavy
         }
-
-        guard let optimizedPlayback = runtime.asset.optimizedPlayback else {
-            return runtime.asset.eligibility.isHeavy
-        }
-
-        return playbackEvaluator.profile(
-            containerType: "mp4",
-            codecType: optimizedPlayback.codecType,
-            pixelSize: optimizedPlayback.pixelSize,
-            frameRate: optimizedPlayback.frameRate,
-            estimatedBitRate: optimizedPlayback.estimatedBitRate,
-            hardwareDecodeLikely: true
-        ).isHeavy
-    }
-
-    private func optimizedPlaybackURL(for asset: WallpaperAsset) -> URL? {
-        guard let optimizedPlayback = asset.optimizedPlayback,
-              let supportDirectory = try? FileManager.default.wallpaperApplicationSupportDirectory() else {
-            return nil
-        }
-
-        let url = supportDirectory.appendingPathComponent(optimizedPlayback.relativePath)
-        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-        return url
+        return playbackEvaluator.effectiveProfile(for: group.asset).isHeavy
     }
 }

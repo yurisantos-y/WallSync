@@ -30,4 +30,10 @@ struct RenderSession: Identifiable, Hashable, Sendable {
     var energyMode: EnergyMode
     var startedAt: Date
     var lastVisibilityChange: Date
+    var playbackSource: PlaybackSource? = nil
+
+    enum PlaybackSource: String, Codable, Sendable {
+        case optimized
+        case original
+    }
 }

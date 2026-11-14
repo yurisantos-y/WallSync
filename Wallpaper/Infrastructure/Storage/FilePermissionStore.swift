@@ -6,10 +6,21 @@ actor FilePermissionStore: PermissionStoring {
     private var activeScopeCounts: [UUID: Int] = [:]
     private var activeURLs: [UUID: URL] = [:]
     private var loaded = false
+    private var loadIssue: StorageIssue?
 
-    init(fileManager: FileManager = .default) {
-        let supportDirectory = try! fileManager.wallpaperApplicationSupportDirectory()
-        self.fileURL = supportDirectory.appendingPathComponent("bookmarks.json")
+    init(fileURL: URL) {
+        self.fileURL = fileURL
+    }
+
+    /// Loads the bookmark file and reports whether it had to be reset.
+    func load() -> StorageIssue? {
+        loadIfNeeded()
+        return loadIssue
+    }
+
+    /// Number of security scopes currently held, for diagnostics and tests.
+    var activeScopeCount: Int {
+        activeScopeCounts.values.reduce(0, +)
     }
 
     func createBookmark(for url: URL) throws -> AccessBookmark {
@@ -30,18 +41,18 @@ actor FilePermissionStore: PermissionStoring {
     }
 
     func storeBookmark(_ bookmark: AccessBookmark) throws {
-        try loadIfNeeded()
+        loadIfNeeded()
         bookmarks[bookmark.id] = bookmark
         try persist()
     }
 
     func bookmark(for id: UUID) -> AccessBookmark? {
-        try? loadIfNeeded()
+        loadIfNeeded()
         return bookmarks[id]
     }
 
     func resolveBookmark(id: UUID) throws -> URL {
-        try loadIfNeeded()
+        loadIfNeeded()
 
         guard var bookmark = bookmarks[id] else {
             throw PermissionError.bookmarkNotFound
@@ -62,34 +73,38 @@ actor FilePermissionStore: PermissionStoring {
             bookmarkDataIsStale: &isStale
         )
 
-        if isStale {
-            bookmark.bookmarkData = try url.bookmarkData(
-                options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
-            bookmark.isStale = false
-        }
-
         guard url.startAccessingSecurityScopedResource() else {
             throw PermissionError.cannotAccessScopedResource
         }
 
-        bookmark.lastResolvedAt = .now
-        bookmarks[id] = bookmark
+        // From here on the scope is held; nothing below may throw, otherwise
+        // the caller would never know it has to call `stopAccess`.
         activeURLs[id] = url
         activeScopeCounts[id] = 1
+        bookmark.lastResolvedAt = .now
 
         if isStale {
-            try persist()
+            if let refreshed = try? url.bookmarkData(
+                options: [.withSecurityScope, .securityScopeAllowOnlyReadAccess],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            ) {
+                bookmark.bookmarkData = refreshed
+                bookmark.isStale = false
+            } else {
+                bookmark.isStale = true
+            }
+        }
+
+        bookmarks[id] = bookmark
+        if isStale {
+            try? persist()
         }
 
         return url
     }
 
     func stopAccess(for id: UUID) {
-        try? loadIfNeeded()
-
         guard let count = activeScopeCounts[id] else { return }
         if count > 1 {
             activeScopeCounts[id] = count - 1
@@ -102,24 +117,44 @@ actor FilePermissionStore: PermissionStoring {
         }
     }
 
-    private func loadIfNeeded() throws {
+    func removeBookmark(id: UUID) throws {
+        loadIfNeeded()
+        releaseAllScopes(for: id)
+        guard bookmarks.removeValue(forKey: id) != nil else { return }
+        try persist()
+    }
+
+    /// Drops bookmarks that no asset references any more.
+    @discardableResult
+    func pruneBookmarks(keeping ids: Set<UUID>) throws -> Int {
+        loadIfNeeded()
+        let stale = bookmarks.keys.filter { !ids.contains($0) }
+        guard !stale.isEmpty else { return 0 }
+        for id in stale {
+            releaseAllScopes(for: id)
+            bookmarks[id] = nil
+        }
+        try persist()
+        return stale.count
+    }
+
+    private func releaseAllScopes(for id: UUID) {
+        activeScopeCounts[id] = nil
+        if let url = activeURLs.removeValue(forKey: id) {
+            url.stopAccessingSecurityScopedResource()
+        }
+    }
+
+    private func loadIfNeeded() {
         guard !loaded else { return }
         loaded = true
-
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            bookmarks = [:]
-            return
-        }
-
-        let data = try Data(contentsOf: fileURL)
-        bookmarks = try JSONDecoder().decode([UUID: AccessBookmark].self, from: data)
+        let result = JSONFile.load([UUID: AccessBookmark].self, from: fileURL, defaultValue: [:])
+        bookmarks = result.value
+        loadIssue = result.issue
     }
 
     private func persist() throws {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(bookmarks)
-        try data.write(to: fileURL, options: .atomic)
+        try JSONFile.save(bookmarks, to: fileURL)
     }
 }
 
@@ -130,9 +165,9 @@ enum PermissionError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .bookmarkNotFound:
-            return "O bookmark do video nao foi encontrado."
+            return String(localized: "The saved permission for this video was not found.")
         case .cannotAccessScopedResource:
-            return "O app nao conseguiu acessar o arquivo autorizado."
+            return String(localized: "WallSync could not access the authorized file.")
         }
     }
 }

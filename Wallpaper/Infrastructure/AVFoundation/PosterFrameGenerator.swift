@@ -4,6 +4,14 @@ import Foundation
 
 actor PosterFrameGenerator {
     func generatePoster(for url: URL, maxPixelSize: CGSize) throws -> NSImage {
+        Self.nsImage(from: try generatePosterImage(for: url, maxPixelSize: maxPixelSize))
+    }
+
+    func generatePosterBox(for url: URL, maxPixelSize: CGSize) throws -> CGImageBox {
+        CGImageBox(try generatePosterImage(for: url, maxPixelSize: maxPixelSize))
+    }
+
+    func generatePosterImage(for url: URL, maxPixelSize: CGSize) throws -> CGImage {
         let asset = AVURLAsset(url: url)
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
@@ -16,7 +24,7 @@ actor PosterFrameGenerator {
         return Self.image(from: image, constrainedTo: maxPixelSize)
     }
 
-    private static func image(from image: CGImage, constrainedTo maximumSize: CGSize) -> NSImage {
+    private static func image(from image: CGImage, constrainedTo maximumSize: CGSize) -> CGImage {
         let sourceSize = CGSize(width: image.width, height: image.height)
         let targetSize = constrainedSize(sourceSize: sourceSize, maximumSize: maximumSize)
 
@@ -30,17 +38,13 @@ actor PosterFrameGenerator {
                 space: CGColorSpaceCreateDeviceRGB(),
                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
               ) else {
-            return nsImage(from: image)
+            return image
         }
 
         context.interpolationQuality = .high
         context.draw(image, in: CGRect(origin: .zero, size: targetSize))
 
-        guard let resizedImage = context.makeImage() else {
-            return nsImage(from: image)
-        }
-
-        return nsImage(from: resizedImage)
+        return context.makeImage() ?? image
     }
 
     private static func nsImage(from image: CGImage) -> NSImage {

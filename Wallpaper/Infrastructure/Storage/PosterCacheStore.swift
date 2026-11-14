@@ -1,60 +1,84 @@
-import AppKit
+import CoreGraphics
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 
 actor PosterCacheStore {
-    private let postersDirectory: URL
-    private let memoryCache = NSCache<NSString, NSImage>()
+    private let storage: StorageLocations
+    private let memoryCache = NSCache<NSString, CGImageBox>()
 
-    init(fileManager: FileManager = .default) {
-        let supportDirectory = try! fileManager.wallpaperApplicationSupportDirectory()
-        self.postersDirectory = supportDirectory.appendingPathComponent("Posters", isDirectory: true)
+    init(storage: StorageLocations) {
+        self.storage = storage
         memoryCache.countLimit = 32
         memoryCache.totalCostLimit = 96 * 1024 * 1024
-
-        if !fileManager.fileExists(atPath: postersDirectory.path) {
-            try? fileManager.createDirectory(at: postersDirectory, withIntermediateDirectories: true)
-        }
     }
 
-    func savePoster(_ image: NSImage, for assetID: UUID) throws -> String {
-        let relativePath = "Posters/\(assetID.uuidString).png"
-        let destination = postersDirectory.appendingPathComponent("\(assetID.uuidString).png")
-        guard let data = image.pngData() else {
-            throw PosterCacheError.encodingFailed
-        }
-        try data.write(to: destination, options: .atomic)
-        memoryCache.setObject(image, forKey: relativePath as NSString, cost: image.memoryCost)
+    func savePoster(_ box: CGImageBox, for assetID: UUID) throws -> String {
+        let image = box.image
+        let relativePath = "\(StorageLocations.postersDirectoryName)/\(assetID.uuidString).png"
+        try Self.write(image, to: storage.url(forRelativePath: relativePath), type: .png)
+        memoryCache.setObject(CGImageBox(image), forKey: relativePath as NSString, cost: image.memoryCost)
         return relativePath
     }
 
-    func loadPoster(relativePath: String?) -> NSImage? {
+    func loadPoster(relativePath: String?) -> CGImageBox? {
         guard let relativePath else { return nil }
         let cacheKey = relativePath as NSString
-        if let cachedImage = memoryCache.object(forKey: cacheKey) {
-            return cachedImage
+        if let cached = memoryCache.object(forKey: cacheKey) {
+            return cached
         }
 
-        let supportDirectory = try? FileManager.default.wallpaperApplicationSupportDirectory()
-        guard let supportDirectory else { return nil }
-        let image = NSImage(contentsOf: supportDirectory.appendingPathComponent(relativePath))
-        if let image {
-            memoryCache.setObject(image, forKey: cacheKey, cost: image.memoryCost)
+        let url = storage.url(forRelativePath: relativePath)
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else {
+            return nil
         }
-        return image
+
+        let box = CGImageBox(image)
+        memoryCache.setObject(box, forKey: cacheKey, cost: image.memoryCost)
+        return box
+    }
+
+    func evict(relativePath: String?) {
+        guard let relativePath else { return }
+        memoryCache.removeObject(forKey: relativePath as NSString)
+    }
+
+    static func write(_ image: CGImage, to url: URL, type: UTType, quality: Double? = nil) throws {
+        let temporaryURL = url.deletingLastPathComponent()
+            .appendingPathComponent(".\(UUID().uuidString).\(url.pathExtension)")
+        guard let destination = CGImageDestinationCreateWithURL(
+            temporaryURL as CFURL, type.identifier as CFString, 1, nil
+        ) else {
+            throw PosterCacheError.encodingFailed
+        }
+
+        var properties: [CFString: Any] = [:]
+        if let quality {
+            properties[kCGImageDestinationLossyCompressionQuality] = quality
+        }
+        CGImageDestinationAddImage(destination, image, properties as CFDictionary)
+
+        guard CGImageDestinationFinalize(destination) else {
+            try? FileManager.default.removeItem(at: temporaryURL)
+            throw PosterCacheError.encodingFailed
+        }
+
+        _ = try FileManager.default.replaceItemAt(url, withItemAt: temporaryURL)
     }
 }
 
-private extension NSImage {
-    var memoryCost: Int {
-        guard let representation = representations.first else {
-            let width = max(1, Int(size.width))
-            let height = max(1, Int(size.height))
-            return width * height * 4
-        }
+final class CGImageBox: @unchecked Sendable {
+    let image: CGImage
 
-        let width = max(1, representation.pixelsWide)
-        let height = max(1, representation.pixelsHigh)
-        return width * height * 4
+    init(_ image: CGImage) {
+        self.image = image
+    }
+}
+
+extension CGImage {
+    var memoryCost: Int {
+        max(1, bytesPerRow * height)
     }
 }
 
@@ -64,7 +88,7 @@ enum PosterCacheError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .encodingFailed:
-            return "Nao foi possivel codificar o poster do video."
+            return String(localized: "The video poster could not be encoded.")
         }
     }
 }

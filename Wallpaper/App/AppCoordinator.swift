@@ -5,6 +5,7 @@ import Observation
 @MainActor
 @Observable
 final class AppCoordinator {
+    @ObservationIgnored let storage: StorageLocations
     @ObservationIgnored let settingsStore: SettingsStore
     @ObservationIgnored let assetCatalogStore: AssetCatalogStore
     @ObservationIgnored let permissionStore: FilePermissionStore
@@ -21,12 +22,15 @@ final class AppCoordinator {
     @ObservationIgnored private let reconciliationPolicy = SessionReconciliationPolicy()
     @ObservationIgnored private let powerSourceMonitor: PowerSourceMonitor
     @ObservationIgnored private let thermalMonitor: ThermalMonitor
-    @ObservationIgnored private let fullscreenWindowDetector: FullscreenWindowDetector
     @ObservationIgnored private let importVideoUseCase: ImportVideoUseCase
     @ObservationIgnored private let statusItemController: StatusItemController
     @ObservationIgnored private let systemMonitor: SystemEventMonitor
     @ObservationIgnored private let sessionManager: WallpaperSessionManager
+    @ObservationIgnored private let janitor: AssetStorageJanitor
     @ObservationIgnored private var scheduledReconcileTask: Task<Void, Never>?
+    @ObservationIgnored private var restoreGate = StartupRestoreGate()
+    @ObservationIgnored private var startupIssues: [StorageIssue] = []
+    @ObservationIgnored private var hasLoadedPersistedState = false
     @ObservationIgnored private var openMainWindowAction: (() -> Void)?
 
     var assets: [WallpaperAsset] = []
@@ -38,23 +42,31 @@ final class AppCoordinator {
     var lastErrorMessage: String?
 
     init() {
-        let settingsStore = SettingsStore()
-        let assetCatalogStore = AssetCatalogStore()
-        let permissionStore = FilePermissionStore()
-        let posterCacheStore = PosterCacheStore()
+        let storage: StorageLocations
+        do {
+            storage = try StorageLocations.resolve()
+        } catch {
+            // Keep the app usable for this run and tell the user why nothing
+            // will be saved, instead of crashing at launch.
+            let fallback = StorageLocations(
+                root: FileManager.default.temporaryDirectory.appendingPathComponent("WallSync-unsaved", isDirectory: true)
+            )
+            try? fallback.prepareDirectories()
+            storage = fallback
+            startupIssues.append(.storageUnavailable(description: error.localizedDescription))
+        }
+
+        let settingsStore = SettingsStore(placementsURL: storage.placementsFile)
+        let assetCatalogStore = AssetCatalogStore(fileURL: storage.assetsFile)
+        let permissionStore = FilePermissionStore(fileURL: storage.bookmarksFile)
+        let posterCacheStore = PosterCacheStore(storage: storage)
         let metadataLoader = AssetMetadataLoader()
         let posterFrameGenerator = PosterFrameGenerator()
-        let videoAssetOptimizer = VideoAssetOptimizer()
-        let displayManager = DisplayManager()
+        let videoAssetOptimizer = VideoAssetOptimizer(storage: storage)
+        let janitor = AssetStorageJanitor(storage: storage)
         let energyPolicy = EnergyPolicyController()
-        let startupLoginManager = StartupLoginManager()
-        let nativeDesktopPictureManager = NativeDesktopPictureManager()
-        let startupManager = StartupManager()
-        let powerSourceMonitor = PowerSourceMonitor()
-        let thermalMonitor = ThermalMonitor()
-        let fullscreenWindowDetector = FullscreenWindowDetector()
-        let statusItemController = StatusItemController()
 
+        self.storage = storage
         self.settingsStore = settingsStore
         self.assetCatalogStore = assetCatalogStore
         self.permissionStore = permissionStore
@@ -62,28 +74,30 @@ final class AppCoordinator {
         self.metadataLoader = metadataLoader
         self.posterFrameGenerator = posterFrameGenerator
         self.videoAssetOptimizer = videoAssetOptimizer
-        self.displayManager = displayManager
+        self.janitor = janitor
+        self.displayManager = DisplayManager()
         self.energyPolicy = energyPolicy
-        self.startupLoginManager = startupLoginManager
-        self.nativeDesktopPictureManager = nativeDesktopPictureManager
-        self.startupManager = startupManager
-        self.powerSourceMonitor = powerSourceMonitor
-        self.thermalMonitor = thermalMonitor
-        self.fullscreenWindowDetector = fullscreenWindowDetector
-        self.statusItemController = statusItemController
+        self.startupLoginManager = StartupLoginManager()
+        self.nativeDesktopPictureManager = NativeDesktopPictureManager(storage: storage)
+        self.startupManager = StartupManager()
+        self.powerSourceMonitor = PowerSourceMonitor()
+        self.thermalMonitor = ThermalMonitor()
+        self.statusItemController = StatusItemController()
         self.systemMonitor = SystemEventMonitor()
 
         self.importVideoUseCase = ImportVideoUseCase(
+            storage: storage,
             permissionStore: permissionStore,
             metadataLoader: metadataLoader,
             posterFrameGenerator: posterFrameGenerator,
             posterCacheStore: posterCacheStore,
-            videoAssetOptimizer: videoAssetOptimizer
+            videoAssetOptimizer: videoAssetOptimizer,
+            janitor: janitor
         )
 
         self.sessionManager = WallpaperSessionManager(
+            environment: LiveSessionEnvironment(storage: storage, posterCacheStore: posterCacheStore),
             permissionStore: permissionStore,
-            posterCacheStore: posterCacheStore,
             energyPolicy: energyPolicy
         )
 
@@ -92,6 +106,12 @@ final class AppCoordinator {
             self.activeSessions = sessions
             self.updateRuntimeState {
                 $0.visibleSessions = Set(sessions.filter { $0.windowState == .visible }.map(\.id))
+            }
+        }
+
+        self.sessionManager.onFullscreenDisplaysChanged = { [weak self] displayUUIDs in
+            self?.updateRuntimeState {
+                $0.fullscreenDisplayUUIDs = displayUUIDs
             }
         }
 
@@ -116,10 +136,15 @@ final class AppCoordinator {
         }
     }
 
-    func shutdown() {
+    /// Returns once every window, player and security scope has been released.
+    func shutdown() async {
         scheduledReconcileTask?.cancel()
-        sessionManager.stopAll()
         systemMonitor.stop()
+        await sessionManager.stopAll()
+    }
+
+    func dismissError() {
+        lastErrorMessage = nil
     }
 
     func openSettings() {
@@ -179,7 +204,26 @@ final class AppCoordinator {
             do {
                 try await assetCatalogStore.saveAssets(assets)
                 try await settingsStore.savePlacements(placements)
-                scheduleReconcile(trigger: .manual, reason: "asset_removed")
+            } catch {
+                present(error)
+            }
+
+            // Stop anything still playing the asset before its files go away.
+            await reconcileNow(reason: "asset_removed")
+            await deleteStoredData(of: asset)
+        }
+    }
+
+    /// Frees everything an asset owns: optimized video, poster, cached poster
+    /// and the security-scoped bookmark of the original file.
+    private func deleteStoredData(of asset: WallpaperAsset) async {
+        await posterCacheStore.evict(relativePath: asset.posterImageRelativePath)
+        await janitor.removeFiles(ownedBy: asset)
+
+        let bookmarkStillUsed = assets.contains { $0.originalBookmarkID == asset.originalBookmarkID }
+        if !bookmarkStillUsed {
+            do {
+                try await permissionStore.removeBookmark(id: asset.originalBookmarkID)
             } catch {
                 present(error)
             }
@@ -255,12 +299,7 @@ final class AppCoordinator {
     }
 
     func posterURL(for asset: WallpaperAsset) -> URL? {
-        guard let relativePath = asset.posterImageRelativePath,
-              let supportDirectory = try? FileManager.default.wallpaperApplicationSupportDirectory() else {
-            return nil
-        }
-
-        return supportDirectory.appendingPathComponent(relativePath)
+        asset.posterImageRelativePath.map(storage.url(forRelativePath:))
     }
 
     func assignAsset(_ assetID: UUID?, to display: DisplayTarget) {
@@ -372,14 +411,32 @@ final class AppCoordinator {
     }
 
     private func loadPersistedState() async {
-        do {
-            preferences = try await settingsStore.loadPreferences()
-            placements = try await settingsStore.loadPlacements()
-            assets = try await assetCatalogStore.loadAssets()
-            startupLoginState = startupLoginManager.currentState()
-            refreshRuntimeState()
-        } catch {
-            present(error)
+        let loadedPreferences = await settingsStore.loadPreferences()
+        let loadedPlacements = await settingsStore.loadPlacements()
+        let loadedAssets = await assetCatalogStore.loadAssets()
+        let bookmarkIssue = await permissionStore.load()
+
+        preferences = loadedPreferences.value
+        placements = loadedPlacements.value
+        assets = loadedAssets.value
+        startupLoginState = startupLoginManager.currentState()
+        hasLoadedPersistedState = true
+        refreshRuntimeState()
+
+        startupIssues.append(
+            contentsOf: [loadedPreferences.issue, loadedPlacements.issue, loadedAssets.issue, bookmarkIssue].compactMap { $0 }
+        )
+        if !startupIssues.isEmpty {
+            lastErrorMessage = startupIssues.map(\.message).joined(separator: "\n")
+        }
+
+        // Never sweep "orphans" against a catalog that failed to load: every
+        // file would look unreferenced.
+        if loadedAssets.issue == nil && startupIssues.allSatisfy({ if case .storageUnavailable = $0 { return false } else { return true } }) {
+            await janitor.removeOrphans(keeping: assets)
+            if bookmarkIssue == nil {
+                _ = try? await permissionStore.pruneBookmarks(keeping: Set(assets.map(\.originalBookmarkID)))
+            }
         }
     }
 
@@ -390,7 +447,6 @@ final class AppCoordinator {
             $0.powerSource = powerSourceMonitor.currentPowerSource()
             $0.lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
             $0.thermalState = thermalMonitor.currentThermalState()
-            $0.fullscreenDisplayUUIDs = fullscreenWindowDetector.fullscreenDisplayUUIDs(displays: activeDisplays)
         }
     }
 
@@ -401,12 +457,21 @@ final class AppCoordinator {
         syncNativeDesktopPictures()
 
         await sessionManager.reconcile(
-            displays: runtimeState.activeDisplays,
-            assets: assets,
-            placements: placements,
-            preferences: preferences,
-            runtimeState: runtimeState
+            SessionReconcileRequest(
+                displays: runtimeState.activeDisplays,
+                assets: assets,
+                placements: placements,
+                preferences: preferences,
+                runtimeState: runtimeState
+            )
         )
+    }
+
+    /// Reconciles immediately, bypassing the debounce, and waits for it.
+    private func reconcileNow(reason: String) async {
+        scheduledReconcileTask?.cancel()
+        guard restoreGate.shouldReconcile(isUserInitiated: true, startOnLaunch: preferences.startOnLaunch) else { return }
+        await refreshEnvironmentAndReconcile(reason: reason)
     }
 
     private func persistPreferencesAndReconcile(reason: String) {
@@ -447,7 +512,9 @@ final class AppCoordinator {
             updateRuntimeState {
                 $0.sleepState = .sleeping
             }
-            sessionManager.stopAll()
+            Task {
+                await sessionManager.stopAll()
+            }
         case .didWake:
             updateRuntimeState {
                 $0.sleepState = .awake
@@ -513,9 +580,14 @@ final class AppCoordinator {
         scheduledReconcileTask = Task { [weak self] in
             guard let self else { return }
             await startupManager.waitBeforeRestore(for: trigger)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, hasLoadedPersistedState else { return }
 
-            if trigger == .appLaunch && !preferences.startOnLaunch && activeSessions.isEmpty {
+            // The decision "wallpapers were not started at launch" is state,
+            // not a property of whichever trigger won the debounce race.
+            guard restoreGate.shouldReconcile(
+                isUserInitiated: trigger == .manual,
+                startOnLaunch: preferences.startOnLaunch
+            ) else {
                 refreshRuntimeState()
                 return
             }

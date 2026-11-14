@@ -2,25 +2,29 @@ import AppKit
 import AVFoundation
 import Foundation
 
+/// Layer tree of a wallpaper window: a still poster at the bottom and the
+/// video on top. The poster stays in place underneath the video so there is
+/// never a blank frame while a player is starting.
 final class WallpaperHostView: NSView {
     private let posterLayer = CALayer()
-    private let videoLayer = AVPlayerLayer()
+    let playerLayer = AVPlayerLayer()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
-        layer = CALayer()
-        layer?.backgroundColor = NSColor.clear.cgColor
+        let rootLayer = CALayer()
+        rootLayer.backgroundColor = NSColor.clear.cgColor
+        layer = rootLayer
 
         configure(layer: posterLayer)
         posterLayer.contentsGravity = .resizeAspectFill
-        posterLayer.isHidden = false
-        configure(layer: videoLayer)
-        videoLayer.videoGravity = .resizeAspectFill
-        videoLayer.isHidden = true
+        posterLayer.masksToBounds = true
+        configure(layer: playerLayer)
+        playerLayer.videoGravity = .resizeAspectFill
+        playerLayer.isHidden = true
 
-        layer?.addSublayer(posterLayer)
-        layer?.addSublayer(videoLayer)
+        rootLayer.addSublayer(posterLayer)
+        rootLayer.addSublayer(playerLayer)
     }
 
     required init?(coder: NSCoder) {
@@ -31,51 +35,39 @@ final class WallpaperHostView: NSView {
         super.layout()
         withoutImplicitAnimations {
             posterLayer.frame = bounds
-            videoLayer.frame = bounds
+            playerLayer.frame = bounds
         }
     }
 
-    func attach(player: AVPlayer?, poster: NSImage?, contentMode: WallpaperPlacement.ContentMode) {
-        videoLayer.player = player
-        updatePoster(poster)
-        setContentMode(contentMode)
-    }
-
     func setContentMode(_ contentMode: WallpaperPlacement.ContentMode) {
-        let gravity: CALayerContentsGravity = contentMode == .aspectFit ? .resizeAspect : .resizeAspectFill
-        posterLayer.contentsGravity = gravity
-        videoLayer.videoGravity = contentMode == .aspectFit ? .resizeAspect : .resizeAspectFill
+        withoutImplicitAnimations {
+            posterLayer.contentsGravity = contentMode == .aspectFit ? .resizeAspect : .resizeAspectFill
+            playerLayer.videoGravity = contentMode == .aspectFit ? .resizeAspect : .resizeAspectFill
+        }
     }
 
-    func updatePoster(_ image: NSImage?) {
+    func setPoster(_ image: CGImage?) {
         withoutImplicitAnimations {
             posterLayer.contents = image
         }
     }
 
-    func showVideoLayer() {
+    func setVideoVisible(_ isVisible: Bool) {
         withoutImplicitAnimations {
-            posterLayer.isHidden = true
-            videoLayer.isHidden = false
+            playerLayer.isHidden = !isVisible
         }
     }
 
-    func showPosterLayer() {
-        withoutImplicitAnimations {
-            videoLayer.isHidden = true
-            posterLayer.isHidden = false
-        }
-    }
-
-    func detachPlayer() {
-        videoLayer.player = nil
-        showPosterLayer()
+    func setPlayer(_ player: AVPlayer?) {
+        guard playerLayer.player !== player else { return }
+        playerLayer.player = player
     }
 
     private func configure(layer: CALayer) {
         layer.actions = [
             "bounds": NSNull(),
             "contents": NSNull(),
+            "contentsGravity": NSNull(),
             "hidden": NSNull(),
             "position": NSNull()
         ]

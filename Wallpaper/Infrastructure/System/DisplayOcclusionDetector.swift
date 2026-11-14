@@ -1,4 +1,4 @@
-import ApplicationServices
+import CoreGraphics
 import Foundation
 
 struct DisplayOcclusionDetector {
@@ -8,63 +8,36 @@ struct DisplayOcclusionDetector {
         static let minimumWindowHeight: CGFloat = 64
     }
 
-    func isDisplayCovered(
-        _ display: DisplayTarget,
-        windows: [[String: Any]]? = nil
-    ) -> Bool {
+    func isDisplayCovered(_ display: DisplayTarget, windows: [[String: Any]]? = nil) -> Bool {
         coverageRatio(for: display, windows: windows) >= Constant.coverageThreshold
     }
 
-    func coverageRatio(
-        for display: DisplayTarget,
-        windows: [[String: Any]]? = nil
-    ) -> CGFloat {
-        let windows = windows ?? (
-            CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
-        )
+    func isDisplayCovered(_ display: DisplayTarget, snapshot: WindowListSnapshot) -> Bool {
+        coverageRatio(for: display, snapshot: snapshot) >= Constant.coverageThreshold
+    }
 
+    func coverageRatio(for display: DisplayTarget, windows: [[String: Any]]? = nil) -> CGFloat {
+        let snapshot = windows.map(WindowListSnapshot.init(rawWindows:)) ?? WindowListProvider.captureOnScreenWindows()
+        return coverageRatio(for: display, snapshot: snapshot)
+    }
+
+    func coverageRatio(for display: DisplayTarget, snapshot: WindowListSnapshot) -> CGFloat {
         let displayArea = display.frame.width * display.frame.height
         guard displayArea > 0 else { return 0 }
 
-        let coveredRectangles = windows.compactMap { window -> CGRect? in
-            guard let bounds = normalWindowBounds(for: window) else { return nil }
-            let overlap = bounds.intersection(display.frame)
+        let coveredRectangles = snapshot.windows.compactMap { window -> CGRect? in
+            guard window.layer == 0,
+                  window.alpha > 0,
+                  window.bounds.width >= Constant.minimumWindowWidth,
+                  window.bounds.height >= Constant.minimumWindowHeight else {
+                return nil
+            }
+            let overlap = window.bounds.intersection(display.frame)
             guard !overlap.isNull, !overlap.isEmpty else { return nil }
             return overlap
         }
 
         return Self.unionArea(of: coveredRectangles) / displayArea
-    }
-
-    private func normalWindowBounds(for window: [String: Any]) -> CGRect? {
-        guard let layer = number(in: window, key: kCGWindowLayer as String)?.intValue,
-              layer == 0,
-              let alpha = number(in: window, key: kCGWindowAlpha as String)?.doubleValue,
-              alpha > 0,
-              let boundsDictionary = window[kCGWindowBounds as String] as? NSDictionary,
-              let bounds = CGRect(dictionaryRepresentation: boundsDictionary),
-              bounds.width >= Constant.minimumWindowWidth,
-              bounds.height >= Constant.minimumWindowHeight else {
-            return nil
-        }
-
-        return bounds
-    }
-
-    private func number(in window: [String: Any], key: String) -> NSNumber? {
-        if let number = window[key] as? NSNumber {
-            return number
-        }
-
-        if let intValue = window[key] as? Int {
-            return NSNumber(value: intValue)
-        }
-
-        if let doubleValue = window[key] as? Double {
-            return NSNumber(value: doubleValue)
-        }
-
-        return nil
     }
 
     static func unionArea(of rectangles: [CGRect]) -> CGFloat {

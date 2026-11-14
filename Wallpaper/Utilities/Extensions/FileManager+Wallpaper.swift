@@ -1,7 +1,8 @@
-import AppKit
 import Foundation
 
 extension FileManager {
+    /// `Application Support/Wallpaper`. The directory keeps the project's
+    /// original name; renaming it would require migrating existing installs.
     func wallpaperApplicationSupportDirectory() throws -> URL {
         let root = try url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
         let directory = root.appendingPathComponent("Wallpaper", isDirectory: true)
@@ -9,14 +10,5 @@ extension FileManager {
             try createDirectory(at: directory, withIntermediateDirectories: true)
         }
         return directory
-    }
-}
-
-extension NSImage {
-    func pngData() -> Data? {
-        guard let tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiffRepresentation) else {
-            return nil
-        }
-        return bitmap.representation(using: .png, properties: [:])
     }
 }

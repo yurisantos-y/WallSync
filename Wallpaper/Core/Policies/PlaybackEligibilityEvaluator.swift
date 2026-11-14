@@ -1,13 +1,43 @@
 import Foundation
 
 struct PlaybackEligibilityEvaluator {
+    enum ReasonCode {
+        static let unsupportedFormat = "unsupported_format"
+        static let exceedsDirectPlaybackLimits = "exceeds_direct_playback_limits"
+        /// Written by earlier versions; still present in stored catalogs.
+        static let legacyExceedsLimits = "exceeds_mvp_limits"
+        static let highResolution = "high_resolution"
+        static let highFrameRate = "high_frame_rate"
+        static let highBitrate = "high_bitrate"
+        static let hardwareDecodeUncertain = "hardware_decode_uncertain"
+    }
+
+    /// The profile of what will actually be played: the optimized rendition
+    /// when one exists, otherwise the original file.
+    func effectiveProfile(for asset: WallpaperAsset) -> PlaybackProfile {
+        guard let optimized = asset.optimizedPlayback else {
+            return asset.eligibility
+        }
+
+        return profile(
+            containerType: "mp4",
+            codecType: optimized.codecType,
+            pixelSize: optimized.pixelSize,
+            frameRate: optimized.frameRate,
+            estimatedBitRate: optimized.estimatedBitRate,
+            hardwareDecodeLikely: true,
+            enforcesDirectPlaybackLimits: false
+        )
+    }
+
     func profile(
         containerType: String,
         codecType: String,
         pixelSize: CGSize,
         frameRate: Double,
         estimatedBitRate: Double,
-        hardwareDecodeLikely: Bool
+        hardwareDecodeLikely: Bool,
+        enforcesDirectPlaybackLimits: Bool = true
     ) -> PlaybackProfile {
         let width = Int(pixelSize.width)
         let height = Int(pixelSize.height)
@@ -19,24 +49,24 @@ struct PlaybackEligibilityEvaluator {
         let normalizedContainer = containerType.lowercased()
         let normalizedCodec = codecType.lowercased()
 
-        let supportedContainer = ["mp4", "mov"].contains(normalizedContainer)
+        let supportedContainer = ["mp4", "mov", "m4v"].contains(normalizedContainer)
         let supportedCodec = normalizedCodec.contains("h264") || normalizedCodec.contains("hevc")
 
-        guard supportedContainer, supportedCodec else {
+        guard !enforcesDirectPlaybackLimits || (supportedContainer && supportedCodec) else {
             return PlaybackProfile(
                 tier: .unsupported,
                 hardwareDecodeLikely: hardwareDecodeLikely,
-                reasonCodes: ["unsupported_format"],
+                reasonCodes: [ReasonCode.unsupportedFormat],
                 isHeavy: true,
                 recommendedMode: .unsupported
             )
         }
 
-        if frameRate > 60 || width > 4096 || height > 2304 {
+        if enforcesDirectPlaybackLimits && (frameRate > 60 || width > 4096 || height > 2304) {
             return PlaybackProfile(
                 tier: .unsupported,
                 hardwareDecodeLikely: hardwareDecodeLikely,
-                reasonCodes: ["exceeds_mvp_limits"],
+                reasonCodes: [ReasonCode.exceedsDirectPlaybackLimits],
                 isHeavy: true,
                 recommendedMode: .unsupported
             )

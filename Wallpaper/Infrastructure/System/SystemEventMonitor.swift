@@ -16,6 +16,8 @@ final class SystemEventMonitor {
     private var observers: [NSObjectProtocol] = []
     var handler: ((Event) -> Void)?
     private var isDisplayCallbackRegistered = false
+    private let powerSourceObserver = PowerSourceObserver()
+    private var lastPowerSource: AppRuntimeState.PowerSource?
 
     init(handler: ((Event) -> Void)? = nil) {
         self.handler = handler
@@ -40,6 +42,17 @@ final class SystemEventMonitor {
         )
 
         registerDisplayCallback()
+
+        // IOKit fires for every battery-level update; only a change of source
+        // (charger connected or disconnected) is an event for the app.
+        lastPowerSource = PowerSourceMonitor().currentPowerSource()
+        powerSourceObserver.start { [weak self] in
+            guard let self else { return }
+            let current = PowerSourceMonitor().currentPowerSource()
+            guard current != self.lastPowerSource else { return }
+            self.lastPowerSource = current
+            self.emit(.powerStateChanged)
+        }
 
         observers.append(
             workspaceCenter.addObserver(
@@ -112,6 +125,7 @@ final class SystemEventMonitor {
         }
         observers.removeAll()
         unregisterDisplayCallback()
+        powerSourceObserver.stop()
     }
 
     private func emit(_ event: Event) {

@@ -6,23 +6,29 @@ actor SettingsStore: SettingsStoring {
 
     private enum DefaultsKeys {
         static let preferences = "wallpaper.preferences"
+        static let corruptedPreferences = "wallpaper.preferences.corrupt"
     }
 
-    init(
-        defaults: UserDefaults = .standard,
-        fileManager: FileManager = .default
-    ) {
+    init(defaults: UserDefaults = .standard, placementsURL: URL) {
         self.defaults = defaults
-        let supportDirectory = try! fileManager.wallpaperApplicationSupportDirectory()
-        self.placementsURL = supportDirectory.appendingPathComponent("placements.json")
+        self.placementsURL = placementsURL
     }
 
-    func loadPreferences() throws -> UserPreferences {
+    func loadPreferences() -> StoreLoadResult<UserPreferences> {
         guard let data = defaults.data(forKey: DefaultsKeys.preferences) else {
-            return .defaultValue
+            return StoreLoadResult(value: .defaultValue, issue: nil)
         }
 
-        return try JSONDecoder().decode(UserPreferences.self, from: data)
+        do {
+            return StoreLoadResult(value: try JSONDecoder().decode(UserPreferences.self, from: data), issue: nil)
+        } catch {
+            defaults.set(data, forKey: DefaultsKeys.corruptedPreferences)
+            defaults.removeObject(forKey: DefaultsKeys.preferences)
+            return StoreLoadResult(
+                value: .defaultValue,
+                issue: .corruptedFile(name: DefaultsKeys.preferences, preservedAs: DefaultsKeys.corruptedPreferences)
+            )
+        }
     }
 
     func savePreferences(_ preferences: UserPreferences) throws {
@@ -30,19 +36,11 @@ actor SettingsStore: SettingsStoring {
         defaults.set(data, forKey: DefaultsKeys.preferences)
     }
 
-    func loadPlacements() throws -> [WallpaperPlacement] {
-        guard FileManager.default.fileExists(atPath: placementsURL.path) else {
-            return []
-        }
-
-        let data = try Data(contentsOf: placementsURL)
-        return try JSONDecoder().decode([WallpaperPlacement].self, from: data)
+    func loadPlacements() -> StoreLoadResult<[WallpaperPlacement]> {
+        JSONFile.load([WallpaperPlacement].self, from: placementsURL, defaultValue: [])
     }
 
     func savePlacements(_ placements: [WallpaperPlacement]) throws {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(placements)
-        try data.write(to: placementsURL, options: .atomic)
+        try JSONFile.save(placements, to: placementsURL)
     }
 }

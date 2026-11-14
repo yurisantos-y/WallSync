@@ -46,7 +46,7 @@ struct LibraryView: View {
     }
 
     private func statusColor(for asset: WallpaperAsset) -> Color {
-        switch asset.eligibility.tier {
+        switch AssetInspector.effectiveProfile(for: asset).tier {
         case .safe:
             return .green
         case .warning:
@@ -79,8 +79,8 @@ struct LibraryView: View {
                         )
                     }
 
-                    if !asset.eligibility.reasonCodes.isEmpty {
-                        Text("Motivos: \(asset.eligibility.reasonCodes.joined(separator: ", "))")
+                    if !AssetInspector.effectiveProfile(for: asset).reasonCodes.isEmpty {
+                        Text("Motivos: \(AssetInspector.effectiveProfile(for: asset).reasonCodes.joined(separator: ", "))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -100,7 +100,7 @@ struct LibraryView: View {
                             coordinator.setGlobalAsset(asset.id)
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(asset.eligibility.tier == .unsupported)
+                        .disabled(AssetInspector.effectiveProfile(for: asset).tier == .unsupported)
 
                         Button("Remover", role: .destructive) {
                             coordinator.removeAsset(asset)
