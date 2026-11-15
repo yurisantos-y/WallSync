@@ -306,7 +306,9 @@ final class AppCoordinator {
         importActivities[assetID] = ImportActivity(
             progress: 0,
             isQueued: true,
-            isReoptimization: kind == .reoptimization
+            isReoptimization: kind == .reoptimization,
+            isApplyingEdits: kind == .reoptimization
+                && (assets.first { $0.id == assetID }).map(OptimizationPlanner.isStale(asset:)) == true
         )
 
         let previous = optimizationQueueTail
@@ -346,25 +348,60 @@ final class AppCoordinator {
                 }
             )
 
-            guard let index = assets.firstIndex(where: { $0.id == assetID }) else {
+            guard let existingIndex = assets.firstIndex(where: { $0.id == assetID }) else {
                 // Removed from the library while it was being optimized.
                 await janitor.removeFile(relativePath: rendition.relativePath)
                 return
             }
 
-            let previousPath = assets[index].optimizedPlayback?.relativePath
+            let previousPath = assets[existingIndex].optimizedPlayback?.relativePath
+            let previousRecipe = assets[existingIndex].optimizedPlayback?.recipe ?? .empty
+            let previousPosterPaths = [assets[existingIndex].posterImageRelativePath, assets[existingIndex].thumbnailRelativePath].compactMap { $0 }
+
+            // Different edits show a different picture: the poster comes
+            // from the new rendition, not from the start of the original.
+            let newPoster: StoredPoster? = rendition.recipe == previousRecipe
+                ? nil
+                : await importPipeline.makePoster(
+                    fromRenditionAt: storage.url(forRelativePath: rendition.relativePath),
+                    assetID: assetID,
+                    maximumPixelSize: displayManager.currentDisplays().largestPixelSize
+                )
+            guard let index = assets.firstIndex(where: { $0.id == assetID }) else {
+                await janitor.removeFile(relativePath: rendition.relativePath)
+                for path in [newPoster?.posterPath, newPoster?.thumbnailPath].compactMap({ $0 }) {
+                    await janitor.removeFile(relativePath: path)
+                }
+                return
+            }
+
             updateAssets {
                 $0[index].optimizedPlayback = rendition
                 $0[index].optimizationState = .ready
                 $0[index].originalUnavailable = false
+                if let newPoster {
+                    $0[index].posterImageRelativePath = newPoster.posterPath
+                    $0[index].thumbnailRelativePath = newPoster.thumbnailPath
+                }
             }
             try await assetCatalogStore.saveAssets(assets)
+            if newPoster != nil {
+                for path in previousPosterPaths {
+                    await posterCacheStore.evict(relativePath: path)
+                    ThumbnailCache.shared.evict(storage.url(forRelativePath: path))
+                }
+            }
 
             // Sessions switch to the new file without interrupting playback;
             // only then is the previous rendition deleted.
             await reconcileRespectingGate(reason: "rendition_ready")
             if let previousPath, previousPath != rendition.relativePath {
                 await janitor.removeFile(relativePath: previousPath)
+            }
+            if newPoster != nil {
+                for path in previousPosterPaths {
+                    await janitor.removeFile(relativePath: path)
+                }
             }
         } catch is CancellationError {
             await handleCancelledOptimization(of: asset, kind: kind)
@@ -390,6 +427,15 @@ final class AppCoordinator {
             if case ImportError.originalUnavailable = error {
                 updateAssets { $0[index].originalUnavailable = true }
                 try? await assetCatalogStore.saveAssets(assets)
+            }
+            // Edits the user asked for must not fail silently.
+            if OptimizationPlanner.isStale(asset: assets[index]) {
+                Log.importing.error("asset \(asset.id.uuidString, privacy: .public): edits could not be applied: \(error.localizedDescription, privacy: .public)")
+                if case ImportError.originalUnavailable = error {
+                    present(error)
+                } else {
+                    present(ImportError.editsFailed(name: asset.displayName))
+                }
             }
 
         case .initialImport, .resume:
@@ -483,6 +529,21 @@ final class AppCoordinator {
             }
             scheduleMaintenanceOptimizations()
         }
+    }
+
+    /// Opens the original file of an asset for the editor. Returns `nil`
+    /// when it can no longer be reached; balance with `endEditing(_:)`.
+    func beginEditing(_ asset: WallpaperAsset) async -> URL? {
+        let url = await importPipeline.beginAccessToOriginal(of: asset)
+        if url == nil, let index = assets.firstIndex(where: { $0.id == asset.id }), !assets[index].originalUnavailable {
+            updateAssets { $0[index].originalUnavailable = true }
+            try? await assetCatalogStore.saveAssets(assets)
+        }
+        return url
+    }
+
+    func endEditing(_ asset: WallpaperAsset) async {
+        await importPipeline.endAccessToOriginal(of: asset)
     }
 
     func removeAsset(_ asset: WallpaperAsset) {

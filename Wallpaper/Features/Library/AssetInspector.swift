@@ -28,6 +28,9 @@ enum AssetInspector {
                 return String(localized: "Waiting to optimize")
             }
             let percent = Int((activity.progress * 100).rounded())
+            if activity.isApplyingEdits {
+                return String(localized: "Applying edits \(percent)%")
+            }
             return activity.isReoptimization
                 ? String(localized: "Improving quality \(percent)%")
                 : String(localized: "Optimizing \(percent)%")

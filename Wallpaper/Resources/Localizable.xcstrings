@@ -385,6 +385,38 @@
         }
       }
     },
+    "Apply": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aplicar"
+          }
+        }
+      }
+    },
+    "Applying edits %lld%%": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applying edits %lld%%"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aplicando edições %lld%%"
+          }
+        }
+      }
+    },
     "Automatic policies": {
       "localizations": {
         "en": {
@@ -609,6 +641,22 @@
         }
       }
     },
+    "Closest match found. A short crossfade hides the remaining difference.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Closest match found. A short crossfade hides the remaining difference."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Melhor correspondência encontrada. Um crossfade curto esconde a diferença que resta."
+          }
+        }
+      }
+    },
     "Connect a display, or wait a moment for the system to finish detecting it.": {
       "localizations": {
         "en": {
@@ -685,6 +733,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Crítica"
+          }
+        }
+      }
+    },
+    "Crossfade": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crossfade"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crossfade"
           }
         }
       }
@@ -881,6 +945,102 @@
         }
       }
     },
+    "Edit loop": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit loop"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar loop"
+          }
+        }
+      }
+    },
+    "Edit loop…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit loop…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar loop…"
+          }
+        }
+      }
+    },
+    "Edit the loop of %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit the loop of %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar o loop de %@"
+          }
+        }
+      }
+    },
+    "Edited": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edited"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editado"
+          }
+        }
+      }
+    },
+    "Edits are made from the original video, which cannot be reached. The current version keeps playing.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edits are made from the original video, which cannot be reached. The current version keeps playing."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "As edições são feitas a partir do vídeo original, que não está acessível. A versão atual continua em reprodução."
+          }
+        }
+      }
+    },
+    "Edits not applied": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edits not applied"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edições não aplicadas"
+          }
+        }
+      }
+    },
     "Efficiency (up to 30 fps)": {
       "localizations": {
         "en": {
@@ -909,6 +1069,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Eficiência gasta menos energia. Fluidez mantém até 60 quadros por segundo e praticamente dobra o trabalho de decodificação; na bateria, vídeos a 60 fps aparecem como um quadro estático quando “Reduzir atividade na bateria” está ativado."
+          }
+        }
+      }
+    },
+    "End %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "End %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fim %@"
           }
         }
       }
@@ -1005,6 +1181,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Preencher a tela"
+          }
+        }
+      }
+    },
+    "Finds the start and end points that match best.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Finds the start and end points that match best."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Encontra os pontos de início e fim que melhor combinam."
           }
         }
       }
@@ -1281,6 +1473,70 @@
         }
       }
     },
+    "Looking for loop points": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Looking for loop points"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Procurando pontos de loop"
+          }
+        }
+      }
+    },
+    "Loop end": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loop end"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fim do loop"
+          }
+        }
+      }
+    },
+    "Loop length %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loop length %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duração do loop %@"
+          }
+        }
+      }
+    },
+    "Loop start": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loop start"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Início do loop"
+          }
+        }
+      }
+    },
     "Low Power Mode": {
       "localizations": {
         "en": {
@@ -1373,6 +1629,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nenhum monitor encontrado"
+          }
+        }
+      }
+    },
+    "No good loop points were found. Adjust them by hand.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No good loop points were found. Adjust them by hand."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum bom ponto de loop foi encontrado. Ajuste manualmente."
           }
         }
       }
@@ -1921,6 +2193,22 @@
         }
       }
     },
+    "Play the seam": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play the seam"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tocar a emenda"
+          }
+        }
+      }
+    },
     "Playback": {
       "localizations": {
         "en": {
@@ -2001,6 +2289,22 @@
         }
       }
     },
+    "Plays the last moments of the loop followed by its beginning.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plays the last moments of the loop followed by its beginning."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toca os últimos instantes do loop seguidos do começo."
+          }
+        }
+      }
+    },
     "Plays without sound": {
       "localizations": {
         "en": {
@@ -2061,6 +2365,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Preparando"
+          }
+        }
+      }
+    },
+    "Preview of the edited loop": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview of the edited loop"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pré-visualização do loop editado"
           }
         }
       }
@@ -2205,6 +2525,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Remover %@"
+          }
+        }
+      }
+    },
+    "Reset": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Redefinir"
           }
         }
       }
@@ -2433,6 +2769,22 @@
         }
       }
     },
+    "Start %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Início %@"
+          }
+        }
+      }
+    },
     "Start wallpapers when the app opens": {
       "localizations": {
         "en": {
@@ -2497,6 +2849,38 @@
         }
       }
     },
+    "Stop": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stop"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parar"
+          }
+        }
+      }
+    },
+    "Suggest": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suggest"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sugerir"
+          }
+        }
+      }
+    },
     "Suspended": {
       "localizations": {
         "en": {
@@ -2541,6 +2925,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Temperatura: %@"
+          }
+        }
+      }
+    },
+    "The edits to “%@” could not be applied. The previous version keeps playing.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The edits to “%@” could not be applied. The previous version keeps playing."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível aplicar as edições em “%@”. A versão anterior continua em reprodução."
+          }
+        }
+      }
+    },
+    "The end of the loop dissolves into its beginning, so the video repeats without a visible jump.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The end of the loop dissolves into its beginning, so the video repeats without a visible jump."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O fim do loop se dissolve no começo, e o vídeo se repete sem salto visível."
           }
         }
       }
@@ -2637,6 +3053,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "O arquivo selecionado não contém uma trilha de vídeo."
+          }
+        }
+      }
+    },
+    "The start and end match: no crossfade is needed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The start and end match: no crossfade is needed."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O início e o fim combinam: nenhum crossfade é necessário."
           }
         }
       }
@@ -2769,6 +3201,22 @@
         }
       }
     },
+    "This Mac cannot process the edits: no graphics device is available.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Mac cannot process the edits: no graphics device is available."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este Mac não consegue processar as edições: nenhum dispositivo gráfico está disponível."
+          }
+        }
+      }
+    },
     "Tint color": {
       "localizations": {
         "en": {
@@ -2845,6 +3293,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Usar o wallpaper de todos os monitores"
+          }
+        }
+      }
+    },
+    "Use the whole video, without a crossfade.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use the whole video, without a crossfade."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa o vídeo inteiro, sem crossfade."
           }
         }
       }

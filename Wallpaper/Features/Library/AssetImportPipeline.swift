@@ -9,6 +9,8 @@ struct ImportActivity: Equatable, Sendable {
     var isQueued: Bool
     /// Producing a better rendition of an asset that is already usable.
     var isReoptimization: Bool
+    /// The new rendition applies edits made in the editor.
+    var isApplyingEdits: Bool = false
 }
 
 /// The two steps of bringing a video into the library:
@@ -141,6 +143,31 @@ final class AssetImportPipeline {
         )
     }
 
+    /// A poster taken from the finished rendition, so it shows the edited
+    /// video (the chosen section, without the removed logo).
+    func makePoster(fromRenditionAt url: URL, assetID: UUID, maximumPixelSize: CGSize) async -> StoredPoster? {
+        guard let poster = try? await posterFrameGenerator.generatePosterBox(for: url, maxPixelSize: maximumPixelSize) else {
+            return nil
+        }
+        let revision = String(UUID().uuidString.prefix(8)).lowercased()
+        return try? await posterCacheStore.savePoster(poster, for: assetID, revision: revision)
+    }
+
+    /// Starts access to the original file of an asset. Balance with
+    /// `endAccessToOriginal(of:)`.
+    func beginAccessToOriginal(of asset: WallpaperAsset) async -> URL? {
+        guard let url = try? await permissionStore.resolveBookmark(id: asset.originalBookmarkID) else { return nil }
+        guard FileManager.default.isReadableFile(atPath: url.path) else {
+            await permissionStore.stopAccess(for: asset.originalBookmarkID)
+            return nil
+        }
+        return url
+    }
+
+    func endAccessToOriginal(of asset: WallpaperAsset) async {
+        await permissionStore.stopAccess(for: asset.originalBookmarkID)
+    }
+
     /// Produces a playback rendition from the original file.
     func optimize(
         asset: WallpaperAsset,
@@ -184,6 +211,7 @@ enum ImportError: LocalizedError, Equatable {
     case cannotBePlayedOrConverted(name: String)
     case originalUnavailable(name: String)
     case optimizationFailedPlayingOriginal(name: String)
+    case editsFailed(name: String)
 
     var errorDescription: String? {
         switch self {
@@ -195,6 +223,8 @@ enum ImportError: LocalizedError, Equatable {
             return String(localized: "The original file of “\(name)” is no longer accessible.")
         case let .optimizationFailedPlayingOriginal(name):
             return String(localized: "“\(name)” could not be optimized. WallSync will play the original file instead.")
+        case let .editsFailed(name):
+            return String(localized: "The edits to “\(name)” could not be applied. The previous version keeps playing.")
         }
     }
 }

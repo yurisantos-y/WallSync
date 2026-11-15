@@ -65,7 +65,27 @@ actor VideoAssetOptimizer {
             quality: quality,
             hevcHardwareAvailable: capabilityInspector.hardwareDecodeLikely(for: kCMVideoCodecType_HEVC)
         )
-        let plan = OptimizationPlanner.plan(source: source, target: target)
+        // Edits are applied here, once; playback never sees the recipe.
+        // The recipe is recorded on the rendition exactly as it was asked
+        // for; what is applied is clamped to this track's real duration.
+        let requestedRecipe = recipe
+        let recipe = recipe.normalized(duration: timeRange.duration.seconds)
+        let timing = recipe.timing(duration: timeRange.duration.seconds)
+        let keptRange = CMTimeRange(
+            start: timeRange.start + CMTime(seconds: timing.start, preferredTimescale: 60_000),
+            end: timeRange.start + CMTime(seconds: timing.end, preferredTimescale: 60_000)
+        )
+        var trimIsKeyframeAligned = true
+        if recipe.trim != nil {
+            trimIsKeyframeAligned = (try? await videoTrack.load(.canProvideSampleCursors)) == true
+                && Self.isKeyframeAligned(track: videoTrack, range: keptRange, trackEnd: timeRange.end, frameRate: Double(nominalFrameRate))
+        }
+        let plan = OptimizationPlanner.plan(
+            source: source,
+            target: target,
+            recipe: recipe,
+            trimIsKeyframeAligned: trimIsKeyframeAligned
+        )
 
         // A unique name per rendition lets a new one be written while the
         // previous one is still playing.
@@ -93,7 +113,27 @@ actor VideoAssetOptimizer {
                     sourceAsset: sourceAsset,
                     videoTrack: videoTrack,
                     format: format,
+                    timeRange: recipe.trim == nil ? timeRange : keptRange,
+                    destination: partial,
+                    progress: progress
+                )
+            case let .transcode(transcodePlan) where !recipe.isEmpty:
+                Log.importing.info(
+                    "asset \(assetID.uuidString, privacy: .public): applying edits (trim=\(recipe.trim != nil) crossfade=\(recipe.loopCrossfade, format: .fixed(precision: 2))s marks=\(recipe.watermarkRegions.count) crop=\(recipe.crop != nil)) to \(transcodePlan.codec.rawValue, privacy: .public) \(Int(transcodePlan.pixelSize.width))x\(Int(transcodePlan.pixelSize.height))"
+                )
+                try await editTranscode(
+                    sourceAsset: sourceAsset,
+                    videoTrack: videoTrack,
+                    naturalSize: naturalSize,
+                    preferredTransform: preferredTransform,
                     timeRange: timeRange,
+                    keptRange: keptRange,
+                    crossfade: timing.crossfade,
+                    crop: recipe.crop,
+                    minFrameDuration: minFrameDuration,
+                    sourceFrameRate: Double(nominalFrameRate),
+                    sourceColor: color,
+                    plan: transcodePlan,
                     destination: partial,
                     progress: progress
                 )
@@ -131,8 +171,25 @@ actor VideoAssetOptimizer {
             relativePath: "\(StorageLocations.optimizedDirectoryName)/\(fileName)",
             plan: plan,
             source: source,
-            target: target
+            target: target,
+            recipe: requestedRecipe
         )
+    }
+
+    /// Whether `range` can be cut out of the compressed stream without
+    /// decoding: it starts on a keyframe, and ends on one or at the end of
+    /// the video. The track must be able to provide sample cursors.
+    static func isKeyframeAligned(track: AVAssetTrack, range: CMTimeRange, trackEnd: CMTime, frameRate: Double) -> Bool {
+        let tolerance = 0.5 / max(frameRate, 1)
+
+        func isKeyframe(at time: CMTime) -> Bool {
+            guard let cursor = track.makeSampleCursor(presentationTimeStamp: time) else { return false }
+            return abs((cursor.presentationTimeStamp - time).seconds) <= tolerance
+                && cursor.currentSampleSyncInfo.sampleIsFullSync.boolValue
+        }
+
+        guard isKeyframe(at: range.start) else { return false }
+        return (trackEnd - range.end).seconds <= tolerance || isKeyframe(at: range.end)
     }
 
     /// Removes the partial output and the scratch files AVAssetWriter keeps
@@ -153,7 +210,8 @@ actor VideoAssetOptimizer {
         relativePath: String,
         plan: OptimizationPlan,
         source: SourceVideoDescription,
-        target: OptimizationTarget
+        target: OptimizationTarget,
+        recipe: EditRecipe = .empty
     ) async throws -> OptimizedPlaybackAsset {
         let asset = AVURLAsset(url: url)
         guard let track = try await asset.loadTracks(withMediaType: .video).first else {
@@ -186,7 +244,8 @@ actor VideoAssetOptimizer {
             frameRateCap: target.quality.maximumFrameRate,
             isPassthrough: isPassthrough,
             bitDepth: color.bitDepth,
-            isHDR: color.isHDR
+            isHDR: color.isHDR,
+            recipe: recipe
         )
     }
 
@@ -203,6 +262,9 @@ actor VideoAssetOptimizer {
         progress: @escaping @Sendable (Double) -> Void
     ) async throws {
         let reader = try AVAssetReader(asset: sourceAsset)
+        // For a trimmed copy this is the kept range, which starts on a
+        // keyframe; otherwise it is the whole track.
+        reader.timeRange = timeRange
         let readerOutput = AVAssetReaderTrackOutput(track: videoTrack, outputSettings: nil)
         readerOutput.alwaysCopiesSampleData = false
         guard reader.canAdd(readerOutput) else {
@@ -256,14 +318,9 @@ actor VideoAssetOptimizer {
         }
         let colorProperties = outputColor.videoColorProperties
 
-        // Keep the source cadence exactly when the frame rate is not being
-        // reduced (29.97 stays 29.97 instead of being resampled to 30).
-        let frameDuration: CMTime
-        if sourceFrameRate <= plan.frameRate + 0.01, minFrameDuration.isValid, minFrameDuration.seconds > 0 {
-            frameDuration = minFrameDuration
-        } else {
-            frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(1, Int32(plan.frameRate.rounded()))))
-        }
+        let frameDuration = Self.frameDuration(
+            sourceFrameRate: sourceFrameRate, minFrameDuration: minFrameDuration, plan: plan
+        )
 
         let reader = try AVAssetReader(asset: sourceAsset)
         let videoComposition = Self.videoComposition(
@@ -294,6 +351,42 @@ actor VideoAssetOptimizer {
         }
         reader.add(readerOutput)
 
+        let writer = try AVAssetWriter(outputURL: destination, fileType: .mp4)
+        writer.shouldOptimizeForNetworkUse = true
+        let writerInput = AVAssetWriterInput(
+            mediaType: .video,
+            outputSettings: Self.encoderSettings(plan: plan, colorProperties: colorProperties)
+        )
+        writerInput.expectsMediaDataInRealTime = false
+        guard writer.canAdd(writerInput) else {
+            throw VideoOptimizationError.writerSetupFailed
+        }
+        writer.add(writerInput)
+
+        try await TranscodeSession(
+            reader: reader,
+            readerOutput: readerOutput,
+            writer: writer,
+            writerInput: writerInput,
+            timeRange: CMTimeRange(start: .zero, duration: timeRange.duration),
+            progress: progress
+        ).run()
+    }
+
+    /// Keeps the source cadence exactly when the frame rate is not being
+    /// reduced (29.97 stays 29.97 instead of being resampled to 30).
+    private static func frameDuration(sourceFrameRate: Double, minFrameDuration: CMTime, plan: TranscodePlan) -> CMTime {
+        if sourceFrameRate <= plan.frameRate + 0.01, minFrameDuration.isValid, minFrameDuration.seconds > 0 {
+            return minFrameDuration
+        }
+        return CMTime(value: 1, timescale: CMTimeScale(max(1, Int32(plan.frameRate.rounded()))))
+    }
+
+    private static func outputColor(sourceColor: VideoColorDescription, plan: TranscodePlan) -> VideoColorDescription {
+        sourceColor.isHDR && !plan.preservesHDR ? .sdr : sourceColor
+    }
+
+    private static func encoderSettings(plan: TranscodePlan, colorProperties: [String: String]) -> [String: Any] {
         let profileLevel: String
         switch (plan.codec, plan.isTenBit) {
         case (.hevc, true): profileLevel = kVTProfileLevel_HEVC_Main10_AutoLevel as String
@@ -326,30 +419,116 @@ actor VideoAssetOptimizer {
             AVVideoProfileLevelKey: profileLevel
         ]
 
+        return [
+            AVVideoCodecKey: plan.codec == .hevc ? AVVideoCodecType.hevc : AVVideoCodecType.h264,
+            AVVideoWidthKey: Int(plan.pixelSize.width),
+            AVVideoHeightKey: Int(plan.pixelSize.height),
+            AVVideoColorPropertiesKey: colorProperties,
+            AVVideoCompressionPropertiesKey: compression
+        ]
+    }
+
+    // MARK: - Edits
+
+    /// Re-encodes with the recipe applied.
+    ///
+    /// For a kept range `start ..< end` and a dissolve of `d` seconds the
+    /// result lasts `(end - start) - d`. It plays `start + d ..< end`, and
+    /// over its last `d` seconds the first `d` seconds of the range
+    /// (`start ..< start + d`) fade in on top. The result therefore ends on
+    /// the frame just before `start + d` and begins on the frame at
+    /// `start + d`: the loop point is continuous, and `AVPlayerLooper`
+    /// repeats it without a gap.
+    ///
+    /// Frames come out of the reader scaled, oriented and cropped by the
+    /// video composition, in biplanar Y'CbCr at the output bit depth. Frames
+    /// that need no processing go to the encoder untouched; the others are
+    /// processed on the GPU in that same format (see `PlaneProcessor`).
+    private func editTranscode(
+        sourceAsset: AVURLAsset,
+        videoTrack: AVAssetTrack,
+        naturalSize: CGSize,
+        preferredTransform: CGAffineTransform,
+        timeRange: CMTimeRange,
+        keptRange: CMTimeRange,
+        crossfade: TimeInterval,
+        crop: CGRect?,
+        minFrameDuration: CMTime,
+        sourceFrameRate: Double,
+        sourceColor: VideoColorDescription,
+        plan: TranscodePlan,
+        destination: URL,
+        progress: @escaping @Sendable (Double) -> Void
+    ) async throws {
+        let colorProperties = Self.outputColor(sourceColor: sourceColor, plan: plan).videoColorProperties
+        let frameDuration = Self.frameDuration(
+            sourceFrameRate: sourceFrameRate, minFrameDuration: minFrameDuration, plan: plan
+        )
+        let pixelFormat = plan.isTenBit
+            ? kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
+            : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+
+        func makeReader(range: CMTimeRange) throws -> (AVAssetReader, AVAssetReaderVideoCompositionOutput) {
+            let reader = try AVAssetReader(asset: sourceAsset)
+            reader.timeRange = range
+            let output = AVAssetReaderVideoCompositionOutput(
+                videoTracks: [videoTrack],
+                videoSettings: PlaneProcessor.bufferAttributes(pixelFormat: pixelFormat)
+            )
+            output.videoComposition = Self.videoComposition(
+                videoTrack: videoTrack,
+                naturalSize: naturalSize,
+                preferredTransform: preferredTransform,
+                timeRange: timeRange,
+                targetPixelSize: plan.pixelSize,
+                frameDuration: frameDuration,
+                colorProperties: colorProperties,
+                crop: crop
+            )
+            output.alwaysCopiesSampleData = false
+            guard reader.canAdd(output) else { throw VideoOptimizationError.readerSetupFailed }
+            reader.add(output)
+            return (reader, output)
+        }
+
+        let dissolve = CMTime(seconds: crossfade, preferredTimescale: 60_000)
+        let hasDissolve = crossfade > 0
+        let main = try makeReader(
+            range: hasDissolve ? CMTimeRange(start: keptRange.start + dissolve, end: keptRange.end) : keptRange
+        )
+        let head = hasDissolve ? try makeReader(range: CMTimeRange(start: keptRange.start, duration: dissolve)) : nil
+
+        var processor: PlaneProcessor?
+        if hasDissolve {
+            guard let created = PlaneProcessor() else { throw VideoOptimizationError.processingUnavailable }
+            processor = created
+        }
+
         let writer = try AVAssetWriter(outputURL: destination, fileType: .mp4)
         writer.shouldOptimizeForNetworkUse = true
         let writerInput = AVAssetWriterInput(
             mediaType: .video,
-            outputSettings: [
-                AVVideoCodecKey: plan.codec == .hevc ? AVVideoCodecType.hevc : AVVideoCodecType.h264,
-                AVVideoWidthKey: Int(plan.pixelSize.width),
-                AVVideoHeightKey: Int(plan.pixelSize.height),
-                AVVideoColorPropertiesKey: colorProperties,
-                AVVideoCompressionPropertiesKey: compression
-            ]
+            outputSettings: Self.encoderSettings(plan: plan, colorProperties: colorProperties)
         )
         writerInput.expectsMediaDataInRealTime = false
-        guard writer.canAdd(writerInput) else {
-            throw VideoOptimizationError.writerSetupFailed
-        }
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: writerInput, sourcePixelBufferAttributes: nil)
+        guard writer.canAdd(writerInput) else { throw VideoOptimizationError.writerSetupFailed }
         writer.add(writerInput)
 
-        try await TranscodeSession(
-            reader: reader,
-            readerOutput: readerOutput,
+        let outputDuration = keptRange.duration.seconds - crossfade
+        try await EditSession(
+            mainReader: main.0,
+            mainOutput: main.1,
+            headReader: head?.0,
+            headOutput: head?.1,
             writer: writer,
             writerInput: writerInput,
-            timeRange: CMTimeRange(start: .zero, duration: timeRange.duration),
+            adaptor: adaptor,
+            processor: processor,
+            dissolveStart: outputDuration - crossfade,
+            dissolveDuration: crossfade,
+            frameDuration: frameDuration,
+            outputDuration: outputDuration,
             progress: progress
         ).run()
     }
@@ -361,13 +540,20 @@ actor VideoAssetOptimizer {
         timeRange: CMTimeRange,
         targetPixelSize: CGSize,
         frameDuration: CMTime,
-        colorProperties: [String: String]
+        colorProperties: [String: String],
+        crop: CGRect? = nil
     ) -> AVMutableVideoComposition {
         let transformedRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
-        let orientedSize = CGSize(width: abs(transformedRect.width), height: abs(transformedRect.height))
+        let fullSize = CGSize(width: abs(transformedRect.width), height: abs(transformedRect.height))
+        // With a crop, only that part of the upright picture is fitted to
+        // the target; the rest falls outside the render size.
+        let visible = crop.map {
+            CGRect(x: $0.minX * fullSize.width, y: $0.minY * fullSize.height, width: $0.width * fullSize.width, height: $0.height * fullSize.height)
+        } ?? CGRect(origin: .zero, size: fullSize)
+        let orientedSize = visible.size
         let scale = min(targetPixelSize.width / orientedSize.width, targetPixelSize.height / orientedSize.height)
         let translated = preferredTransform.concatenating(
-            CGAffineTransform(translationX: -transformedRect.minX, y: -transformedRect.minY)
+            CGAffineTransform(translationX: -transformedRect.minX - visible.minX, y: -transformedRect.minY - visible.minY)
         )
         let scaled = translated.concatenating(CGAffineTransform(scaleX: scale, y: scale))
         let centered = scaled.concatenating(
@@ -539,12 +725,202 @@ private final class TranscodeSession: @unchecked Sendable {
     }
 }
 
+/// Reads decoded frames, applies the loop dissolve on the GPU and appends
+/// them to the writer, driven by the writer's readiness callback.
+///
+/// Like `TranscodeSession`, it is the single owner of its AVFoundation
+/// objects and only touches them on its private queue once `run()` started.
+private final class EditSession: @unchecked Sendable {
+    private let mainReader: AVAssetReader
+    private let mainOutput: AVAssetReaderOutput
+    private let headReader: AVAssetReader?
+    private let headOutput: AVAssetReaderOutput?
+    private let writer: AVAssetWriter
+    private let writerInput: AVAssetWriterInput
+    private let adaptor: AVAssetWriterInputPixelBufferAdaptor
+    private let processor: PlaneProcessor?
+    private let dissolveStart: Double
+    private let dissolveDuration: Double
+    private let frameDuration: CMTime
+    private let outputDuration: Double
+    private let progress: @Sendable (Double) -> Void
+    private let queue = DispatchQueue(label: "com.yurisantos.wallpaper.edit", qos: .utility)
+
+    private let lock = NSLock()
+    private var isCancelled = false
+    private var continuation: CheckedContinuation<Void, Error>?
+    private var firstTime: CMTime?
+    private var lastOutputTime: CMTime = .zero
+    private var lastReportedPercent = -1
+
+    init(
+        mainReader: AVAssetReader,
+        mainOutput: AVAssetReaderOutput,
+        headReader: AVAssetReader?,
+        headOutput: AVAssetReaderOutput?,
+        writer: AVAssetWriter,
+        writerInput: AVAssetWriterInput,
+        adaptor: AVAssetWriterInputPixelBufferAdaptor,
+        processor: PlaneProcessor?,
+        dissolveStart: Double,
+        dissolveDuration: Double,
+        frameDuration: CMTime,
+        outputDuration: Double,
+        progress: @escaping @Sendable (Double) -> Void
+    ) {
+        self.mainReader = mainReader
+        self.mainOutput = mainOutput
+        self.headReader = headReader
+        self.headOutput = headOutput
+        self.writer = writer
+        self.writerInput = writerInput
+        self.adaptor = adaptor
+        self.processor = processor
+        self.dissolveStart = dissolveStart
+        self.dissolveDuration = dissolveDuration
+        self.frameDuration = frameDuration
+        self.outputDuration = outputDuration
+        self.progress = progress
+    }
+
+    func run() async throws {
+        try Task.checkCancellation()
+
+        guard mainReader.startReading() else {
+            throw mainReader.error ?? VideoOptimizationError.readerSetupFailed
+        }
+        if let headReader, !headReader.startReading() {
+            mainReader.cancelReading()
+            throw headReader.error ?? VideoOptimizationError.readerSetupFailed
+        }
+        guard writer.startWriting() else {
+            cancelReaders()
+            throw writer.error ?? VideoOptimizationError.writerSetupFailed
+        }
+        writer.startSession(atSourceTime: .zero)
+
+        do {
+            try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    lock.withLock { self.continuation = continuation }
+                    writerInput.requestMediaDataWhenReady(on: queue) { [self] in
+                        drain()
+                    }
+                }
+            } onCancel: {
+                lock.withLock { isCancelled = true }
+                queue.async { [self] in
+                    if lock.withLock({ isCancelled }) {
+                        finish(with: CancellationError())
+                    }
+                }
+            }
+        } catch {
+            cancelReaders()
+            queue.sync {}
+            writer.cancelWriting()
+            throw error
+        }
+
+        guard mainReader.status == .completed else {
+            headReader?.cancelReading()
+            writer.cancelWriting()
+            throw mainReader.error ?? VideoOptimizationError.readerFailed
+        }
+        headReader?.cancelReading()
+
+        // The last frame lasts one frame; without this the file would end
+        // on its presentation time and the loop would be one frame short.
+        writer.endSession(atSourceTime: lastOutputTime + frameDuration)
+        await writer.finishWriting()
+        guard writer.status == .completed else {
+            throw writer.error ?? VideoOptimizationError.writerFailed
+        }
+    }
+
+    private func cancelReaders() {
+        mainReader.cancelReading()
+        headReader?.cancelReading()
+    }
+
+    private func drain() {
+        while writerInput.isReadyForMoreMediaData {
+            if lock.withLock({ isCancelled }) {
+                finish(with: CancellationError())
+                return
+            }
+
+            guard let sample = mainOutput.copyNextSampleBuffer() else {
+                finish(with: nil)
+                return
+            }
+            guard let frame = CMSampleBufferGetImageBuffer(sample) else { continue }
+
+            let time = CMSampleBufferGetPresentationTimeStamp(sample)
+            let first = firstTime ?? time
+            firstTime = first
+            let outputTime = time - first
+            let seconds = outputTime.seconds
+
+            var output = frame
+            do {
+                if let processor, let headOutput, dissolveDuration > 0, seconds >= dissolveStart - 0.0005,
+                   let headSample = headOutput.copyNextSampleBuffer(),
+                   let headFrame = CMSampleBufferGetImageBuffer(headSample) {
+                    // Even steps from the last untouched frame to the first
+                    // frame of the next pass of the loop.
+                    let step = frameDuration.seconds
+                    let weight = (seconds - dissolveStart + step) / (dissolveDuration + step)
+                    output = try processor.crossfade(frame, headFrame, weight: Float(weight))
+                }
+            } catch {
+                finish(with: error)
+                return
+            }
+
+            guard adaptor.append(output, withPresentationTime: outputTime) else {
+                finish(with: writer.error ?? VideoOptimizationError.writerAppendFailed)
+                return
+            }
+            lastOutputTime = outputTime
+            report(seconds)
+        }
+    }
+
+    private func report(_ seconds: Double) {
+        guard outputDuration > 0 else { return }
+        let fraction = min(max(seconds / outputDuration, 0), 0.99)
+        let percent = Int(fraction * 100)
+        guard percent != lastReportedPercent else { return }
+        lastReportedPercent = percent
+        progress(fraction)
+    }
+
+    private func finish(with error: Error?) {
+        guard let continuation = lock.withLock({ () -> CheckedContinuation<Void, Error>? in
+            let pending = self.continuation
+            self.continuation = nil
+            return pending
+        }) else {
+            return
+        }
+
+        writerInput.markAsFinished()
+        if let error {
+            continuation.resume(throwing: error)
+        } else {
+            continuation.resume()
+        }
+    }
+}
+
 enum VideoOptimizationError: LocalizedError {
     case readerSetupFailed
     case writerSetupFailed
     case writerAppendFailed
     case readerFailed
     case writerFailed
+    case processingUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -558,6 +934,8 @@ enum VideoOptimizationError: LocalizedError {
             return String(localized: "Reading the original video failed.")
         case .writerFailed:
             return String(localized: "Writing the optimized video failed.")
+        case .processingUnavailable:
+            return String(localized: "This Mac cannot process the edits: no graphics device is available.")
         }
     }
 }

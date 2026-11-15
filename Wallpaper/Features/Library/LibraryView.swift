@@ -3,8 +3,17 @@ import SwiftUI
 
 struct LibraryView: View {
     @Environment(AppCoordinator.self) private var coordinator
+    @State private var editedAsset: WallpaperAsset?
 
     var body: some View {
+        page
+            .sheet(item: $editedAsset) { asset in
+                AssetEditorView(asset: asset)
+                    .environment(coordinator)
+            }
+    }
+
+    private var page: some View {
         WallpaperPageScrollView {
             WallpaperPageHeader(
                 String(localized: "Library"),
@@ -124,6 +133,15 @@ struct LibraryView: View {
                             WallpaperStatusPill(label: String(localized: "Plays without sound"), color: .gray)
                         }
 
+                        if !asset.editRecipe.isEmpty {
+                            WallpaperStatusPill(
+                                label: activity == nil && OptimizationPlanner.isStale(asset: asset)
+                                    ? String(localized: "Edits not applied")
+                                    : String(localized: "Edited"),
+                                color: activity == nil && OptimizationPlanner.isStale(asset: asset) ? .orange : .blue
+                            )
+                        }
+
                         if asset.originalUnavailable {
                             WallpaperStatusPill(label: String(localized: "Original file unavailable"), color: .orange)
                                 .help(Text("A sharper copy could not be made because the original file cannot be reached. The current copy is kept."))
@@ -138,6 +156,13 @@ struct LibraryView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(profile.tier == .unsupported && activity == nil)
+
+                        Button("Edit loop…") {
+                            editedAsset = asset
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(asset.optimizationState != .ready)
+                        .accessibilityLabel(Text("Edit the loop of \(asset.displayName)"))
 
                         Button("Remove", role: .destructive) {
                             coordinator.removeAsset(asset)

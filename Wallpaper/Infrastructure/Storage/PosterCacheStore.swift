@@ -24,16 +24,21 @@ actor PosterCacheStore {
     /// (a fraction of the size of PNG for photographic frames), straight from
     /// the `CGImage` — no TIFF round trip. Posters written as PNG by earlier
     /// versions keep loading through `loadPoster`.
-    func savePoster(_ box: CGImageBox, for assetID: UUID) throws -> StoredPoster {
+    ///
+    /// - Parameter revision: gives a poster made after an edit its own file
+    ///   name, so every cache keyed by path or URL (ours, the thumbnail
+    ///   cache, the system's desktop picture cache) sees it as new.
+    func savePoster(_ box: CGImageBox, for assetID: UUID, revision: String? = nil) throws -> StoredPoster {
         let image = box.image
         let directory = StorageLocations.postersDirectoryName
-        let posterPath = "\(directory)/\(assetID.uuidString).heic"
+        let baseName = revision.map { "\(assetID.uuidString)-\($0)" } ?? assetID.uuidString
+        let posterPath = "\(directory)/\(baseName).heic"
         try Self.write(image, to: storage.url(forRelativePath: posterPath), type: .heic, quality: 0.9)
         memoryCache.setObject(box, forKey: posterPath as NSString, cost: image.memoryCost)
 
         var thumbnailPath: String?
         if let thumbnail = Self.downscaled(image, maximumDimension: Self.thumbnailMaximumDimension) {
-            let path = "\(directory)/\(assetID.uuidString)-thumb.heic"
+            let path = "\(directory)/\(baseName)-thumb.heic"
             if (try? Self.write(thumbnail, to: storage.url(forRelativePath: path), type: .heic, quality: 0.8)) != nil {
                 thumbnailPath = path
             }
