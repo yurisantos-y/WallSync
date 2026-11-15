@@ -83,6 +83,10 @@ checklist.
 | 8 | Sleep / wake | Close the lid, reopen | No window is destroyed; the wallpaper is on screen immediately after wake |
 | 9 | Dimming | Scenario 1, then scenario 2, each with Settings › General › Dimming at 0% and at 40% | App CPU unchanged (the dimming layer costs the app nothing per frame). Compare **WindowServer** CPU and GPU power between 0% and 40%: the difference decides whether dimming stays a layer or has to be baked into the rendition |
 | 10 | Half speed | Scenario 2 with the wallpaper's speed at 0.5× | Half the frame-distribution callbacks per second and roughly half the media-engine activity of scenario 2 |
+| 11 | Panorama | Two or more displays, "Stretch one video across the displays" on | Exactly one `Decoding` interval; the picture is continuous across the displays; same app CPU as scenario 2 |
+| 12 | Playlist, desktop visible | An interval playlist of one minute, desktop visible | One wake-up per change (`reconcile … reason=playlist_advance`), nothing in between; at each change the previous `Decoding` interval closes before the next opens |
+| 13 | Playlist, desktop hidden | Same playlist, then lock the screen (or cover the desktop) for several minutes | No `playlist_advance` reconcile and no `decoding started` while hidden; on return one `desktop_visible` reconcile shows the item that is right for the current time |
+| 14 | Features at their defaults | Speed 1×, dimming 0%, no playlist, no panorama, unedited video | Indistinguishable from scenarios 1 and 2 measured before these features existed |
 
 For scenario 2, check sync by filming two displays at 240 fps with a phone
 and stepping through the footage, or by using a clip with a visible frame
