@@ -69,6 +69,7 @@ final class WallpaperSessionManager {
         case apply
         case stop(sequence: Int, CheckedContinuation<Void, Never>)
         case unload(groupKey: String, token: Int)
+        case playbackFailed(groupKey: String)
         case barrier(CheckedContinuation<Void, Never>)
     }
 
@@ -161,6 +162,16 @@ final class WallpaperSessionManager {
         }
     }
 
+    /// Re-applies the current desired state against a fresh look at the
+    /// environment (window list, occlusion). Cheap when nothing changed.
+    func reevaluate(reason: String) {
+        guard activeRequest != nil || pendingRequest != nil else { return }
+        if pendingRequest == nil {
+            activeRequest?.request.reason = reason
+        }
+        enqueueApply()
+    }
+
     /// Returns once every command enqueued so far has been processed.
     func waitUntilIdle() async {
         await withCheckedContinuation { continuation in
@@ -223,6 +234,9 @@ final class WallpaperSessionManager {
         case let .unload(groupKey, token):
             await unloadIdlePlayback(groupKey: groupKey, token: token)
 
+        case let .playbackFailed(groupKey):
+            await handlePlaybackFailure(groupKey: groupKey)
+
         case let .barrier(continuation):
             continuation.resume()
         }
@@ -279,7 +293,7 @@ final class WallpaperSessionManager {
                 surface.setPoster(poster)
                 surface.showPoster()
                 surface.onOcclusionChange = { [weak self] in
-                    self?.enqueueApply()
+                    self?.reevaluate(reason: "window_occlusion_changed")
                 }
 
                 sessions[displayID] = SessionRuntime(
@@ -301,19 +315,28 @@ final class WallpaperSessionManager {
         }
 
         // 3. Refresh per-session environment from a single window snapshot.
-        let snapshot = Signpost.interval(Signpost.Name.windowListQuery) {
-            environment.captureWindowSnapshot()
-        }
+        // When nobody can see the desktop the window list cannot change the
+        // outcome, so it is not even queried.
+        let snapshot = request.runtimeState.isInvisibleToUser
+            ? WindowListSnapshot(windows: [])
+            : Signpost.interval(Signpost.Name.windowListQuery) {
+                environment.captureWindowSnapshot()
+            }
         let fullscreenDisplayUUIDs = fullscreenDetector.fullscreenDisplayUUIDs(
             displays: request.displays,
             snapshot: snapshot
         )
-        if fullscreenDisplayUUIDs != lastFullscreenDisplayUUIDs {
+        if !request.runtimeState.isInvisibleToUser, fullscreenDisplayUUIDs != lastFullscreenDisplayUUIDs {
             lastFullscreenDisplayUUIDs = fullscreenDisplayUUIDs
             onFullscreenDisplaysChanged?(fullscreenDisplayUUIDs)
         }
 
         for (displayID, runtime) in sessions {
+            if request.runtimeState.isInvisibleToUser {
+                // Keep the last known window state: a locked screen must not
+                // flip windows between hidden and shown.
+                continue
+            }
             runtime.isFullscreen = fullscreenDisplayUUIDs.contains(displayID)
             runtime.isOccluded = runtime.surface.isOccluded
                 || occlusionDetector.isDisplayCovered(runtime.session.displayTarget, snapshot: snapshot)
@@ -333,15 +356,23 @@ final class WallpaperSessionManager {
             guard let members = membership[key], let first = members.first else { continue }
             let group = groups[key] ?? {
                 let created = PlaybackGroup(key: key, asset: first.asset, engine: environment.makeEngine())
+                let continuation = commandContinuation
+                created.engine.onPlaybackFailure = {
+                    continuation.yield(.playbackFailed(groupKey: key))
+                }
                 groups[key] = created
                 return created
             }()
 
-            if group.asset.optimizedPlayback != first.asset.optimizedPlayback {
+            let renditionChanged = group.asset.optimizedPlayback != first.asset.optimizedPlayback
+            group.asset = first.asset
+            if renditionChanged {
                 group.optimizedUnavailable = false
                 group.prepareFailed = false
+                if group.isPrepared {
+                    await switchRendition(of: group)
+                }
             }
-            group.asset = first.asset
 
             await applyPolicy(to: group, members: members, request: request)
         }
@@ -518,6 +549,56 @@ final class WallpaperSessionManager {
         }
     }
 
+    /// A new optimized rendition was produced while the asset is on screen:
+    /// switch to it without interrupting playback. The engine only swaps once
+    /// the new file is ready, and keeps playing the old one if it is not.
+    private func switchRendition(of group: PlaybackGroup) async {
+        guard let optimizedURL = environment.optimizedPlaybackURL(for: group.asset) else { return }
+
+        do {
+            try await group.engine.prepare(
+                url: optimizedURL,
+                maximumPixelSize: nil,
+                startTime: group.engine.currentTime
+            )
+            group.source = .optimized
+            // If the original file was being played, its scope is no longer needed.
+            await releaseScope(of: group)
+            Log.playback.info("asset \(group.asset.id.uuidString, privacy: .public): switched to new rendition")
+        } catch {
+            group.optimizedUnavailable = true
+            Log.playback.error(
+                "asset \(group.asset.id.uuidString, privacy: .public): new rendition failed, keeping current playback: \(error.localizedDescription, privacy: .public)"
+            )
+        }
+    }
+
+    /// Playback broke after it had started (for example the file went away).
+    private func handlePlaybackFailure(groupKey: String) async {
+        guard let group = groups[groupKey], group.isPrepared else { return }
+        let failedSource = group.source
+        Log.playback.error(
+            "asset \(group.asset.id.uuidString, privacy: .public): playback failed on source \(failedSource?.rawValue ?? "none", privacy: .public)"
+        )
+
+        for member in sessions.values where self.groupKey(for: member) == groupKey {
+            member.surface.showPoster()
+            if member.isAttached {
+                group.engine.detach(member.surface)
+                member.isAttached = false
+            }
+        }
+        await releasePlayback(of: group)
+
+        if failedSource == .optimized {
+            // Next reconcile falls back to the original file.
+            group.optimizedUnavailable = true
+        } else {
+            group.prepareFailed = true
+        }
+        enqueueApply()
+    }
+
     private func releaseScope(of group: PlaybackGroup) async {
         guard let bookmarkID = group.scopedBookmarkID else { return }
         group.scopedBookmarkID = nil
@@ -636,10 +717,10 @@ final class WallpaperSessionManager {
         onSessionsChanged?(currentSessions)
     }
 
-    /// Sessions with the same key share one playback engine. The key always
-    /// contains the asset, so a group can never outlive an asset change.
+    /// Sessions showing the same asset share one playback engine: the video
+    /// is decoded once however many displays show it.
     private func groupKey(for runtime: SessionRuntime) -> String {
-        "\(runtime.asset.id.uuidString)|\(runtime.session.displayTarget.displayUUID)"
+        runtime.asset.id.uuidString
     }
 
     private static func largestPixelSize(of members: [SessionRuntime]) -> CGSize? {
@@ -667,7 +748,14 @@ final class WallpaperSessionManager {
             isFullscreen: runtime.isFullscreen,
             assetIsHeavy: effectivePlaybackIsHeavy(for: group),
             isPrimaryDisplay: runtime.session.displayTarget.isPrimary,
-            activeDisplayCount: request.displays.count
+            activeDisplayCount: request.displays.count,
+            isSystemSleeping: request.runtimeState.sleepState == .sleeping,
+            isScreenLocked: request.runtimeState.isScreenLocked,
+            displaysAsleep: request.runtimeState.displaysAsleep,
+            isScreenSaverActive: request.runtimeState.isScreenSaverActive,
+            isSessionInactive: request.runtimeState.isSessionInactive,
+            isUserPaused: request.runtimeState.isUserPaused,
+            reduceMotionEnabled: request.runtimeState.reduceMotionEnabled
         )
     }
 

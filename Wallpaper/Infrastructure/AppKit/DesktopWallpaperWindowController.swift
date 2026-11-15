@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 @MainActor
-final class DesktopWallpaperWindowController: NSWindowController, WallpaperSurface {
+final class DesktopWallpaperWindowController: NSWindowController, WallpaperSurface, VideoFrameHosting {
     private(set) var displayTarget: DisplayTarget
     let hostView: WallpaperHostView
     var onOcclusionChange: (() -> Void)?

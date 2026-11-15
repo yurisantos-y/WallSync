@@ -26,7 +26,12 @@ protocol WallpaperSurface: AnyObject {
 protocol SharedPlaybackEngine: AnyObject {
     /// Position of the playhead inside the loop, in seconds.
     var currentTime: TimeInterval { get }
+    /// Called when playback breaks after a successful `prepare`.
+    var onPlaybackFailure: (() -> Void)? { get set }
 
+    /// Loads `url` and gets ready to play it. If the engine is already
+    /// playing something, the switch happens only once the new source is
+    /// ready, and on failure the previous playback is left untouched.
     func prepare(url: URL, maximumPixelSize: CGSize?, startTime: TimeInterval) async throws
     func attach(_ surface: any WallpaperSurface)
     func detach(_ surface: any WallpaperSurface)

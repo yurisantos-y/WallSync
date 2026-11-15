@@ -22,13 +22,19 @@ final class AppCoordinator {
     @ObservationIgnored private let reconciliationPolicy = SessionReconciliationPolicy()
     @ObservationIgnored private let powerSourceMonitor: PowerSourceMonitor
     @ObservationIgnored private let thermalMonitor: ThermalMonitor
-    @ObservationIgnored private let importVideoUseCase: ImportVideoUseCase
+    @ObservationIgnored private let importPipeline: AssetImportPipeline
+    @ObservationIgnored private var optimizationTasks: [UUID: Task<Void, Never>] = [:]
+    @ObservationIgnored private var optimizationQueueTail: Task<Void, Never>?
+    @ObservationIgnored private var reoptimizationAttempted: Set<UUID> = []
+    @ObservationIgnored private var isShuttingDown = false
     @ObservationIgnored private let statusItemController: StatusItemController
     @ObservationIgnored private let systemMonitor: SystemEventMonitor
     @ObservationIgnored private let sessionManager: WallpaperSessionManager
     @ObservationIgnored private let janitor: AssetStorageJanitor
     @ObservationIgnored private let metricsSubscriber = MetricsSubscriber()
     @ObservationIgnored private var scheduledReconcileTask: Task<Void, Never>?
+    @ObservationIgnored private var reevaluationTask: Task<Void, Never>?
+    @ObservationIgnored private var occlusionPollTimer: Timer?
     @ObservationIgnored private var restoreGate = StartupRestoreGate()
     @ObservationIgnored private var startupIssues: [StorageIssue] = []
     @ObservationIgnored private var hasLoadedPersistedState = false
@@ -41,6 +47,8 @@ final class AppCoordinator {
     var activeSessions: [RenderSession] = []
     var startupLoginState: StartupLoginState = .disabled
     var lastErrorMessage: String?
+    /// Background optimizations in flight, keyed by asset.
+    var importActivities: [UUID: ImportActivity] = [:]
 
     init() {
         let storage: StorageLocations
@@ -86,14 +94,13 @@ final class AppCoordinator {
         self.statusItemController = StatusItemController()
         self.systemMonitor = SystemEventMonitor()
 
-        self.importVideoUseCase = ImportVideoUseCase(
+        self.importPipeline = AssetImportPipeline(
             storage: storage,
             permissionStore: permissionStore,
             metadataLoader: metadataLoader,
             posterFrameGenerator: posterFrameGenerator,
             posterCacheStore: posterCacheStore,
-            videoAssetOptimizer: videoAssetOptimizer,
-            janitor: janitor
+            videoAssetOptimizer: videoAssetOptimizer
         )
 
         self.sessionManager = WallpaperSessionManager(
@@ -108,6 +115,7 @@ final class AppCoordinator {
             self.updateRuntimeState {
                 $0.visibleSessions = Set(sessions.filter { $0.windowState == .visible }.map(\.id))
             }
+            self.updateOcclusionPolling()
         }
 
         self.sessionManager.onFullscreenDisplaysChanged = { [weak self] displayUUIDs in
@@ -133,6 +141,10 @@ final class AppCoordinator {
         metricsSubscriber.start()
         Log.session.notice("WallSync \(Self.appVersion, privacy: .public) started")
 
+        updateRuntimeState {
+            $0.isScreenLocked = SystemEventMonitor.isScreenCurrentlyLocked
+        }
+
         Task {
             await loadPersistedState()
             scheduleReconcile(trigger: .appLaunch, reason: "initial_restore")
@@ -141,8 +153,14 @@ final class AppCoordinator {
 
     /// Returns once every window, player and security scope has been released.
     func shutdown() async {
+        isShuttingDown = true
+        optimizationTasks.values.forEach { $0.cancel() }
         scheduledReconcileTask?.cancel()
+        reevaluationTask?.cancel()
+        occlusionPollTimer?.invalidate()
+        occlusionPollTimer = nil
         systemMonitor.stop()
+        metricsSubscriber.stop()
         await sessionManager.stopAll()
     }
 
@@ -191,54 +209,242 @@ final class AppCoordinator {
         openMainWindowAction = action
     }
 
-    func importVideo() {
+    // MARK: - Import
+
+    private enum OptimizationKind {
+        /// First rendition of a video imported in this session.
+        case initialImport
+        /// First rendition of an asset left pending by an earlier session.
+        case resume
+        /// A better rendition of an asset that already plays.
+        case reoptimization
+    }
+
+    /// Asks for one or more files and imports them.
+    func importVideos() {
+        importVideos(at: AssetImportPipeline.chooseFiles())
+    }
+
+    /// Imports the given files (open panel or drag and drop). Each asset shows
+    /// up in the library at once and is optimized in the background.
+    func importVideos(at urls: [URL]) {
+        guard !urls.isEmpty else { return }
+
         Task {
-            do {
-                guard let asset = try await importVideoUseCase.run() else { return }
+            for url in urls {
+                do {
+                    let asset = try await importPipeline.register(
+                        url: url,
+                        maximumPixelSize: displayManager.currentDisplays().largestPixelSize
+                    )
 
-                assets.insert(asset, at: 0)
-                try await assetCatalogStore.saveAssets(assets)
+                    assets.insert(asset, at: 0)
+                    try await assetCatalogStore.saveAssets(assets)
 
-                if placements.isEmpty {
-                    placements = [WallpaperPlacement(assetID: asset.id, scope: .allDisplays)]
-                    try await settingsStore.savePlacements(placements)
-                    refreshRuntimeState()
-                    syncNativeDesktopPictures()
+                    if placements.isEmpty {
+                        placements = [WallpaperPlacement(assetID: asset.id, scope: .allDisplays)]
+                        try await settingsStore.savePlacements(placements)
+                    }
+
+                    enqueueOptimization(for: asset.id, kind: .initialImport)
+                } catch {
+                    present(error)
                 }
-
-                scheduleReconcile(trigger: .manual, reason: "asset_imported")
-            } catch {
-                present(error)
             }
+
+            await reconcileNow(reason: "asset_imported")
+        }
+    }
+
+    func cancelImport(of asset: WallpaperAsset) {
+        optimizationTasks[asset.id]?.cancel()
+    }
+
+    func importActivity(for asset: WallpaperAsset) -> ImportActivity? {
+        importActivities[asset.id]
+    }
+
+    /// Optimizations run one at a time: transcoding is the most expensive
+    /// thing the app does, and several at once would only compete.
+    private func enqueueOptimization(for assetID: UUID, kind: OptimizationKind) {
+        guard optimizationTasks[assetID] == nil else { return }
+
+        importActivities[assetID] = ImportActivity(
+            progress: 0,
+            isQueued: true,
+            isReoptimization: kind == .reoptimization
+        )
+
+        let previous = optimizationQueueTail
+        let task = Task { [weak self] in
+            await previous?.value
+            await self?.runOptimization(for: assetID, kind: kind)
+        }
+        optimizationTasks[assetID] = task
+        optimizationQueueTail = task
+    }
+
+    private func runOptimization(for assetID: UUID, kind: OptimizationKind) async {
+        defer {
+            importActivities[assetID] = nil
+            optimizationTasks[assetID] = nil
+        }
+
+        guard let asset = assets.first(where: { $0.id == assetID }) else { return }
+        guard !Task.isCancelled else {
+            await handleCancelledOptimization(of: asset, kind: kind)
+            return
+        }
+
+        importActivities[assetID]?.isQueued = false
+
+        do {
+            let rendition = try await importPipeline.optimize(
+                asset: asset,
+                maximumPixelSize: displayManager.currentDisplays().largestPixelSize,
+                quality: preferences.playbackQuality,
+                progress: { [weak self] fraction in
+                    Task { @MainActor in
+                        self?.importActivities[assetID]?.progress = fraction
+                    }
+                }
+            )
+
+            guard let index = assets.firstIndex(where: { $0.id == assetID }) else {
+                // Removed from the library while it was being optimized.
+                await janitor.removeFile(relativePath: rendition.relativePath)
+                return
+            }
+
+            let previousPath = assets[index].optimizedPlayback?.relativePath
+            updateAssets {
+                $0[index].optimizedPlayback = rendition
+                $0[index].optimizationState = .ready
+                $0[index].originalUnavailable = false
+            }
+            try await assetCatalogStore.saveAssets(assets)
+
+            // Sessions switch to the new file without interrupting playback;
+            // only then is the previous rendition deleted.
+            await reconcileRespectingGate(reason: "rendition_ready")
+            if let previousPath, previousPath != rendition.relativePath {
+                await janitor.removeFile(relativePath: previousPath)
+            }
+        } catch is CancellationError {
+            await handleCancelledOptimization(of: asset, kind: kind)
+        } catch {
+            await handleFailedOptimization(of: asset, kind: kind, error: error)
+        }
+    }
+
+    private func handleCancelledOptimization(of asset: WallpaperAsset, kind: OptimizationKind) async {
+        Log.importing.info("asset \(asset.id.uuidString, privacy: .public): optimization cancelled")
+        // Quitting mid-import keeps the asset; it resumes at next launch.
+        guard !isShuttingDown, kind == .initialImport else { return }
+        await removeAssetCompletely(asset)
+    }
+
+    private func handleFailedOptimization(of asset: WallpaperAsset, kind: OptimizationKind, error: Error) async {
+        guard let index = assets.firstIndex(where: { $0.id == asset.id }) else { return }
+
+        switch kind {
+        case .reoptimization:
+            // Keep the current rendition; flag it in the library if the
+            // reason is that the original can no longer be reached.
+            if case ImportError.originalUnavailable = error {
+                updateAssets { $0[index].originalUnavailable = true }
+                try? await assetCatalogStore.saveAssets(assets)
+            }
+
+        case .initialImport, .resume:
+            let originalIsPlayable = asset.eligibility.tier != .unsupported
+            if kind == .initialImport && !originalIsPlayable {
+                // Neither playable nor convertible: no dead entry is kept.
+                await removeAssetCompletely(asset)
+                present(ImportError.cannotBePlayedOrConverted(name: asset.displayName))
+                return
+            }
+
+            updateAssets {
+                $0[index].optimizationState = .failed
+                if case ImportError.originalUnavailable = error {
+                    $0[index].originalUnavailable = true
+                }
+            }
+            try? await assetCatalogStore.saveAssets(assets)
+            if kind == .initialImport {
+                present(ImportError.optimizationFailedPlayingOriginal(name: asset.displayName))
+            }
+            await reconcileRespectingGate(reason: "optimization_failed")
+        }
+    }
+
+    /// Queues work that the current displays and preferences call for:
+    /// assets that never got a rendition, and assets in use whose rendition
+    /// is now too small (bigger display connected) or too slow (frame-rate
+    /// ceiling raised) while the source has more to offer.
+    private func scheduleMaintenanceOptimizations() {
+        guard hasLoadedPersistedState, !isShuttingDown else { return }
+
+        for asset in assets where asset.optimizationState == .pending {
+            enqueueOptimization(for: asset.id, kind: .resume)
+        }
+
+        let displays = runtimeState.activeDisplays
+        guard !displays.isEmpty else { return }
+        let maximumPixelSize = displays.largestPixelSize
+        let assetsInUse = Set(placements.filter(\.isEnabled).map(\.assetID))
+
+        for asset in assets
+        where assetsInUse.contains(asset.id)
+            && !reoptimizationAttempted.contains(asset.id)
+            && OptimizationPlanner.needsReoptimization(
+                asset: asset,
+                maximumPixelSize: maximumPixelSize,
+                quality: preferences.playbackQuality
+            ) {
+            // One attempt per launch: an unreachable original is not retried
+            // on every display event.
+            reoptimizationAttempted.insert(asset.id)
+            Log.importing.info("asset \(asset.id.uuidString, privacy: .public): a better rendition is possible, reoptimizing")
+            enqueueOptimization(for: asset.id, kind: .reoptimization)
         }
     }
 
     func removeAsset(_ asset: WallpaperAsset) {
         Task {
-            updateAssets {
-                $0.removeAll { $0.id == asset.id }
-            }
-            updatePlacements {
-                $0.removeAll { $0.assetID == asset.id }
-            }
-
-            do {
-                try await assetCatalogStore.saveAssets(assets)
-                try await settingsStore.savePlacements(placements)
-            } catch {
-                present(error)
-            }
-
-            // Stop anything still playing the asset before its files go away.
-            await reconcileNow(reason: "asset_removed")
-            await deleteStoredData(of: asset)
+            await removeAssetCompletely(asset)
         }
+    }
+
+    private func removeAssetCompletely(_ asset: WallpaperAsset) async {
+        optimizationTasks[asset.id]?.cancel()
+
+        updateAssets {
+            $0.removeAll { $0.id == asset.id }
+        }
+        updatePlacements {
+            $0.removeAll { $0.assetID == asset.id }
+        }
+
+        do {
+            try await assetCatalogStore.saveAssets(assets)
+            try await settingsStore.savePlacements(placements)
+        } catch {
+            present(error)
+        }
+
+        // Stop anything still playing the asset before its files go away.
+        await reconcileRespectingGate(reason: "asset_removed")
+        // Read the latest record: a rendition may have landed meanwhile.
+        await deleteStoredData(of: asset)
     }
 
     /// Frees everything an asset owns: optimized video, poster, cached poster
     /// and the security-scoped bookmark of the original file.
     private func deleteStoredData(of asset: WallpaperAsset) async {
         await posterCacheStore.evict(relativePath: asset.posterImageRelativePath)
+        ThumbnailCache.shared.evict(thumbnailURL(for: asset))
         await janitor.removeFiles(ownedBy: asset)
 
         let bookmarkStillUsed = assets.contains { $0.originalBookmarkID == asset.originalBookmarkID }
@@ -321,6 +527,21 @@ final class AppCoordinator {
 
     func posterURL(for asset: WallpaperAsset) -> URL? {
         asset.posterImageRelativePath.map(storage.url(forRelativePath:))
+    }
+
+    /// The small library thumbnail, or the full poster for assets imported
+    /// before thumbnails existed.
+    func thumbnailURL(for asset: WallpaperAsset) -> URL? {
+        (asset.thumbnailRelativePath ?? asset.posterImageRelativePath).map(storage.url(forRelativePath:))
+    }
+
+    func updatePlaybackQuality(_ quality: UserPreferences.PlaybackQuality) {
+        updatePreferences {
+            $0.playbackQuality = quality
+        }
+        // A higher ceiling may allow better renditions of assets in use.
+        reoptimizationAttempted.removeAll()
+        persistPreferencesAndReconcile(reason: "playback_quality_changed")
     }
 
     func assignAsset(_ assetID: UUID?, to display: DisplayTarget) {
@@ -408,6 +629,23 @@ final class AppCoordinator {
         persistPreferencesAndReconcile(reason: "pause_when_occluded_changed")
     }
 
+    func updatePauseWhenReduceMotion(_ enabled: Bool) {
+        updatePreferences {
+            $0.pauseWhenReduceMotion = enabled
+        }
+        persistPreferencesAndReconcile(reason: "reduce_motion_preference_changed")
+    }
+
+    /// Pauses or resumes every wallpaper (menu bar control). Not persisted:
+    /// a relaunch starts unpaused.
+    func setUserPaused(_ paused: Bool) {
+        guard runtimeState.isUserPaused != paused else { return }
+        updateRuntimeState { $0.isUserPaused = paused }
+        Task {
+            await reconcileNow(reason: paused ? "user_paused" : "user_resumed")
+        }
+    }
+
     func updateFallbackMode(_ mode: UserPreferences.FallbackMode) {
         updatePreferences {
             $0.fallbackMode = mode
@@ -472,25 +710,40 @@ final class AppCoordinator {
             $0.powerSource = powerSourceMonitor.currentPowerSource()
             $0.lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
             $0.thermalState = thermalMonitor.currentThermalState()
+            $0.reduceMotionEnabled = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         }
     }
 
-    private func refreshEnvironmentAndReconcile(reason: String) async {
-        guard runtimeState.sleepState == .awake else { return }
-
+    private func makeReconcileRequest(reason: String) -> SessionReconcileRequest {
         refreshRuntimeState()
         syncNativeDesktopPictures()
 
-        await sessionManager.reconcile(
-            SessionReconcileRequest(
-                displays: runtimeState.activeDisplays,
-                assets: assets,
-                placements: placements,
-                preferences: preferences,
-                runtimeState: runtimeState,
-                reason: reason
-            )
+        return SessionReconcileRequest(
+            displays: runtimeState.activeDisplays,
+            assets: assets,
+            placements: placements,
+            preferences: preferences,
+            runtimeState: runtimeState,
+            reason: reason
         )
+    }
+
+    private func submitReconcile(reason: String) {
+        sessionManager.submit(makeReconcileRequest(reason: reason))
+        scheduleMaintenanceOptimizations()
+    }
+
+    private func refreshEnvironmentAndReconcile(reason: String) async {
+        await sessionManager.reconcile(makeReconcileRequest(reason: reason))
+        scheduleMaintenanceOptimizations()
+    }
+
+    /// Reconciles now and waits, without lifting a suppressed launch restore.
+    private func reconcileRespectingGate(reason: String) async {
+        guard restoreGate.shouldReconcile(isUserInitiated: false, startOnLaunch: preferences.startOnLaunch) else {
+            return
+        }
+        await refreshEnvironmentAndReconcile(reason: reason)
     }
 
     /// Reconciles immediately, bypassing the debounce, and waits for it.
@@ -535,26 +788,84 @@ final class AppCoordinator {
         Log.energy.debug("system event: \(String(describing: event), privacy: .public)")
         switch event {
         case .willSleep:
-            scheduledReconcileTask?.cancel()
-            updateRuntimeState {
-                $0.sleepState = .sleeping
-            }
-            Task {
-                await sessionManager.stopAll()
-            }
+            // Pause and keep windows and posters; the energy policy decides
+            // whether players are released. Nothing is rebuilt on wake.
+            updateRuntimeState { $0.sleepState = .sleeping }
+            reconcileImmediately(reason: "will_sleep")
         case .didWake:
+            updateRuntimeState { $0.sleepState = .awake }
+            reconcileImmediately(reason: "did_wake")
+        case let .screenLockChanged(isLocked):
             updateRuntimeState {
-                $0.sleepState = .awake
+                $0.isScreenLocked = isLocked
+                // Unlocking always ends the screen saver.
+                if !isLocked { $0.isScreenSaverActive = false }
             }
-            scheduleReconcile(trigger: .wake, reason: "wake_restore")
+            reconcileImmediately(reason: isLocked ? "screen_locked" : "screen_unlocked")
+        case let .screenSaverChanged(isActive):
+            updateRuntimeState { $0.isScreenSaverActive = isActive }
+            reconcileImmediately(reason: isActive ? "screensaver_started" : "screensaver_stopped")
+        case let .displaySleepChanged(isAsleep):
+            updateRuntimeState { $0.displaysAsleep = isAsleep }
+            reconcileImmediately(reason: isAsleep ? "displays_asleep" : "displays_awake")
+        case let .sessionActiveChanged(isActive):
+            updateRuntimeState { $0.isSessionInactive = !isActive }
+            reconcileImmediately(reason: isActive ? "session_active" : "session_inactive")
+        case .accessibilityOptionsChanged:
+            scheduleReconcile(trigger: .powerChange, reason: "accessibility_changed")
         case .displaysChanged:
             scheduleReconcile(trigger: .displayChange, reason: "display_changed")
         case .activeSpaceChanged:
             scheduleReconcile(trigger: .activeSpaceChange, reason: "space_changed")
+        case .applicationActivated:
+            // A newly frontmost app is the usual way a window ends up
+            // covering the desktop; give its window time to appear.
+            scheduleReevaluation(after: .milliseconds(350), reason: "app_activated")
         case .powerStateChanged:
             scheduleReconcile(trigger: .powerChange, reason: "power_changed")
         case .thermalStateChanged:
             scheduleReconcile(trigger: .thermalChange, reason: "thermal_changed")
+        }
+    }
+
+    /// Reconciles without debounce. Used for transitions that must take
+    /// effect at once (lock, sleep, display sleep) and never start wallpapers
+    /// that the launch preference is holding back.
+    private func reconcileImmediately(reason: String) {
+        guard hasLoadedPersistedState else { return }
+        scheduledReconcileTask?.cancel()
+        guard restoreGate.shouldReconcile(isUserInitiated: false, startOnLaunch: preferences.startOnLaunch) else {
+            return
+        }
+        submitReconcile(reason: reason)
+    }
+
+    private func scheduleReevaluation(after delay: Duration, reason: String) {
+        reevaluationTask?.cancel()
+        reevaluationTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            self?.sessionManager.reevaluate(reason: reason)
+        }
+    }
+
+    /// Runs the periodic window-list check only while it can change something.
+    private func updateOcclusionPolling() {
+        let shouldPoll = OcclusionPollingPolicy.shouldPoll(sessions: activeSessions)
+        if shouldPoll, occlusionPollTimer == nil {
+            let timer = Timer(timeInterval: OcclusionPollingPolicy.interval, repeats: true) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.sessionManager.reevaluate(reason: "occlusion_poll")
+                }
+            }
+            timer.tolerance = OcclusionPollingPolicy.tolerance
+            RunLoop.main.add(timer, forMode: .common)
+            occlusionPollTimer = timer
+            Log.energy.debug("occlusion polling started")
+        } else if !shouldPoll, let timer = occlusionPollTimer {
+            timer.invalidate()
+            occlusionPollTimer = nil
+            Log.energy.debug("occlusion polling stopped")
         }
     }
 
@@ -617,6 +928,7 @@ final class AppCoordinator {
                 startOnLaunch: preferences.startOnLaunch
             ) else {
                 refreshRuntimeState()
+                scheduleMaintenanceOptimizations()
                 return
             }
 

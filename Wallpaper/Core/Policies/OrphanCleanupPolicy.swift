@@ -16,6 +16,7 @@ enum OrphanCleanupPolicy {
         var paths: Set<String> = []
         if let optimized = asset.optimizedPlayback?.relativePath { paths.insert(optimized) }
         if let poster = asset.posterImageRelativePath { paths.insert(poster) }
+        if let thumbnail = asset.thumbnailRelativePath { paths.insert(thumbnail) }
         return paths
     }
 

@@ -12,14 +12,20 @@ final class DesktopWallpaperWindow: NSWindow {
         )
 
         level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopWindow)))
-        collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
-        backgroundColor = .clear
-        isOpaque = false
+        // No `.fullScreenAuxiliary`: the wallpaper has no business inside
+        // another app's fullscreen Space, and it is hidden there anyway.
+        collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
+        // Opaque with a solid background: the window server does not have to
+        // composite the system wallpaper underneath on every video frame.
+        isOpaque = true
+        backgroundColor = .black
         ignoresMouseEvents = true
         hasShadow = false
         isMovable = false
         isMovableByWindowBackground = false
         isReleasedWhenClosed = false
+        animationBehavior = .none
+        setAccessibilityElement(false)
     }
 
     override var canBecomeKey: Bool { false }

@@ -167,6 +167,7 @@ final class FakeEngine: SharedPlaybackEngine {
     private(set) var teardownCount = 0
     private(set) var attached: [ObjectIdentifier: Bool] = [:]
     var currentTime: TimeInterval = 0
+    var onPlaybackFailure: (() -> Void)?
 
     init(environment: FakeEnvironment) {
         self.environment = environment
@@ -327,6 +328,14 @@ enum SyntheticVideo {
         guard writer.startWriting() else { throw writer.error ?? Failure.writerFailed }
         writer.startSession(atSourceTime: .zero)
 
+        // Audio goes first and is finished at once; otherwise the writer's
+        // interleaving stops accepting video while it waits for audio.
+        if let audioInput {
+            let duration = Double(frameCount) / Double(frameRate)
+            try appendSilence(to: audioInput, duration: duration)
+            audioInput.markAsFinished()
+        }
+
         for index in 0..<frameCount {
             let buffer = try pixelBuffer(size: size, shade: UInt8(40 + (index * 4) % 200))
             while !input.isReadyForMoreMediaData {
@@ -335,12 +344,6 @@ enum SyntheticVideo {
             adaptor.append(buffer, withPresentationTime: CMTime(value: CMTimeValue(index), timescale: frameRate))
         }
         input.markAsFinished()
-
-        if let audioInput {
-            let duration = Double(frameCount) / Double(frameRate)
-            try appendSilence(to: audioInput, duration: duration)
-            audioInput.markAsFinished()
-        }
 
         await writer.finishWriting()
         guard writer.status == .completed else { throw writer.error ?? Failure.writerFailed }

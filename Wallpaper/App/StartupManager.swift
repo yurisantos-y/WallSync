@@ -21,7 +21,8 @@ final class StartupManager {
         case .activeSpaceChange:
             return .milliseconds(180)
         case .wake:
-            return .seconds(1)
+            // Windows and posters survive sleep, so there is nothing to wait for.
+            return .zero
         case .powerChange, .thermalChange:
             return .milliseconds(120)
         case .manual:

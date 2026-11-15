@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Environment(AppCoordinator.self) private var coordinator
     @State private var selection: SettingsDestination = .library
+    @State private var isDropTargeted = false
 
     var body: some View {
         NavigationSplitView {
@@ -16,6 +18,22 @@ struct SettingsView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .background(WallpaperWindowBackground())
+        // Video files can be dropped anywhere on the window.
+        .dropDestination(for: URL.self) { urls, _ in
+            let videos = urls.filter(AssetImportPipeline.isImportable)
+            guard !videos.isEmpty else { return false }
+            coordinator.importVideos(at: videos)
+            selection = .library
+            return true
+        } isTargeted: { isDropTargeted = $0 }
+        .overlay {
+            if isDropTargeted {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [10, 6]))
+                    .padding(10)
+                    .allowsHitTesting(false)
+            }
+        }
     }
 
     @ViewBuilder

@@ -4,16 +4,22 @@ import Foundation
 
 @MainActor
 final class SystemEventMonitor {
-    enum Event {
+    enum Event: Equatable {
         case displaysChanged
         case activeSpaceChanged
+        case applicationActivated
         case willSleep
         case didWake
         case powerStateChanged
         case thermalStateChanged
+        case screenLockChanged(isLocked: Bool)
+        case screenSaverChanged(isActive: Bool)
+        case displaySleepChanged(isAsleep: Bool)
+        case sessionActiveChanged(isActive: Bool)
+        case accessibilityOptionsChanged
     }
 
-    private var observers: [NSObjectProtocol] = []
+    private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
     var handler: ((Event) -> Void)?
     private var isDisplayCallbackRegistered = false
     private let powerSourceObserver = PowerSourceObserver()
@@ -23,24 +29,20 @@ final class SystemEventMonitor {
         self.handler = handler
     }
 
+    /// Whether the login session's screen is locked right now.
+    static var isScreenCurrentlyLocked: Bool {
+        guard let session = CGSessionCopyCurrentDictionary() as? [String: Any] else { return false }
+        return (session["CGSSessionScreenIsLocked"] as? Bool) ?? false
+    }
+
     func start() {
         stop()
 
-        let notificationCenter = NotificationCenter.default
+        let appCenter = NotificationCenter.default
         let workspaceCenter = NSWorkspace.shared.notificationCenter
+        let distributedCenter = DistributedNotificationCenter.default()
 
-        observers.append(
-            notificationCenter.addObserver(
-                forName: NSApplication.didChangeScreenParametersNotification,
-                object: nil,
-                queue: .main
-            ) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    self?.emit(.displaysChanged)
-                }
-            }
-        )
-
+        observe(appCenter, NSApplication.didChangeScreenParametersNotification, .displaysChanged)
         registerDisplayCallback()
 
         // IOKit fires for every battery-level update; only a change of source
@@ -54,78 +56,45 @@ final class SystemEventMonitor {
             self.emit(.powerStateChanged)
         }
 
-        observers.append(
-            workspaceCenter.addObserver(
-                forName: NSWorkspace.activeSpaceDidChangeNotification,
-                object: nil,
-                queue: .main
-            ) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    self?.emit(.activeSpaceChanged)
-                }
-            }
+        observe(workspaceCenter, NSWorkspace.activeSpaceDidChangeNotification, .activeSpaceChanged)
+        observe(workspaceCenter, NSWorkspace.didActivateApplicationNotification, .applicationActivated)
+        observe(workspaceCenter, NSWorkspace.willSleepNotification, .willSleep)
+        observe(workspaceCenter, NSWorkspace.didWakeNotification, .didWake)
+        observe(workspaceCenter, NSWorkspace.screensDidSleepNotification, .displaySleepChanged(isAsleep: true))
+        observe(workspaceCenter, NSWorkspace.screensDidWakeNotification, .displaySleepChanged(isAsleep: false))
+        observe(workspaceCenter, NSWorkspace.sessionDidResignActiveNotification, .sessionActiveChanged(isActive: false))
+        observe(workspaceCenter, NSWorkspace.sessionDidBecomeActiveNotification, .sessionActiveChanged(isActive: true))
+        observe(
+            workspaceCenter,
+            NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            .accessibilityOptionsChanged
         )
 
-        observers.append(
-            workspaceCenter.addObserver(
-                forName: NSWorkspace.willSleepNotification,
-                object: nil,
-                queue: .main
-            ) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    self?.emit(.willSleep)
-                }
-            }
-        )
+        observe(appCenter, NSNotification.Name.NSProcessInfoPowerStateDidChange, .powerStateChanged)
+        observe(appCenter, ProcessInfo.thermalStateDidChangeNotification, .thermalStateChanged)
 
-        observers.append(
-            workspaceCenter.addObserver(
-                forName: NSWorkspace.didWakeNotification,
-                object: nil,
-                queue: .main
-            ) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    self?.emit(.didWake)
-                }
-            }
-        )
-
-        observers.append(
-            notificationCenter.addObserver(
-                forName: NSNotification.Name.NSProcessInfoPowerStateDidChange,
-                object: nil,
-                queue: .main
-            ) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    self?.emit(.powerStateChanged)
-                }
-            }
-        )
-
-        observers.append(
-            notificationCenter.addObserver(
-                forName: ProcessInfo.thermalStateDidChangeNotification,
-                object: nil,
-                queue: .main
-            ) { [weak self] _ in
-                MainActor.assumeIsolated {
-                    self?.emit(.thermalStateChanged)
-                }
-            }
-        )
+        observe(distributedCenter, Notification.Name("com.apple.screenIsLocked"), .screenLockChanged(isLocked: true))
+        observe(distributedCenter, Notification.Name("com.apple.screenIsUnlocked"), .screenLockChanged(isLocked: false))
+        observe(distributedCenter, Notification.Name("com.apple.screensaver.didstart"), .screenSaverChanged(isActive: true))
+        observe(distributedCenter, Notification.Name("com.apple.screensaver.didstop"), .screenSaverChanged(isActive: false))
     }
 
     func stop() {
-        let notificationCenter = NotificationCenter.default
-        let workspaceCenter = NSWorkspace.shared.notificationCenter
-
-        observers.forEach {
-            notificationCenter.removeObserver($0)
-            workspaceCenter.removeObserver($0)
+        for observer in observers {
+            observer.center.removeObserver(observer.token)
         }
         observers.removeAll()
         unregisterDisplayCallback()
         powerSourceObserver.stop()
+    }
+
+    private func observe(_ center: NotificationCenter, _ name: Notification.Name, _ event: Event) {
+        let token = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.emit(event)
+            }
+        }
+        observers.append((center, token))
     }
 
     private func emit(_ event: Event) {

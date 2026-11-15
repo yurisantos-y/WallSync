@@ -11,6 +11,8 @@ struct AssetInspectionResult: Sendable {
     var duration: TimeInterval
     var hasAudio: Bool
     var playbackProfile: PlaybackProfile
+    var color: VideoColorDescription = .sdr
+    var isPlayable: Bool = true
 }
 
 actor AssetMetadataLoader {
@@ -67,6 +69,8 @@ actor AssetMetadataLoader {
             hardwareDecodeLikely: hardwareDecodeLikely
         )
 
+        let isPlayable = (try? await asset.load(.isPlayable)) ?? false
+
         return AssetInspectionResult(
             containerType: containerType,
             codecType: codecDescription,
@@ -75,7 +79,9 @@ actor AssetMetadataLoader {
             estimatedBitRate: estimatedBitRate,
             duration: duration.seconds,
             hasAudio: !audioTracks.isEmpty,
-            playbackProfile: playbackProfile
+            playbackProfile: playbackProfile,
+            color: formatDescriptions.first.map(VideoFormatInspector.colorDescription(of:)) ?? .sdr,
+            isPlayable: isPlayable
         )
     }
 }

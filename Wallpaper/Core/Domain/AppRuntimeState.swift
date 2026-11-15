@@ -20,6 +20,23 @@ struct AppRuntimeState: Sendable {
     var visibleSessions: Set<UUID>
     var sleepState: SleepState
 
+    // States in which nobody can see the desktop. They suspend playback
+    // unconditionally, regardless of the user's preferences.
+    var isScreenLocked = false
+    var isScreenSaverActive = false
+    var displaysAsleep = false
+    /// Another user is in front (fast user switching).
+    var isSessionInactive = false
+
+    /// The user paused every wallpaper from the menu bar.
+    var isUserPaused = false
+    /// System "Reduce motion" accessibility setting.
+    var reduceMotionEnabled = false
+
+    var isInvisibleToUser: Bool {
+        sleepState == .sleeping || isScreenLocked || isScreenSaverActive || displaysAsleep || isSessionInactive
+    }
+
     static let initial = AppRuntimeState(
         powerSource: .unknown,
         lowPowerMode: ProcessInfo.processInfo.isLowPowerModeEnabled,

@@ -36,6 +36,9 @@ final class SessionManagerTests: XCTestCase {
         await manager.reconcile(Fixture.request(displays: displays, assets: [asset]))
 
         XCTAssertEqual(manager.currentSessions.map(\.playbackState), [.animating, .animating])
+        XCTAssertEqual(environment.engines.count, 1, "one decode pipeline for the same video on two displays")
+        XCTAssertEqual(environment.engines[0].attachedCount, 2)
+        XCTAssertEqual(environment.engines[0].prepareAttempts.count, 1)
         XCTAssertTrue(environment.loadedEngines.allSatisfy(\.isPlaying))
         XCTAssertTrue(environment.openSurfaces.allSatisfy { $0.isWindowShown && $0.isShowingVideo })
         await assertNoLeaks(expectedSessions: 2)
@@ -286,5 +289,194 @@ final class SessionManagerTests: XCTestCase {
         XCTAssertEqual(byDisplay["b"]?.energyMode, .suspend)
         XCTAssertEqual(byDisplay["b"]?.windowState, .hidden)
         XCTAssertEqual(fullscreen, ["b"])
+    }
+
+    func testDifferentVideosStayIndependent() async {
+        let displays = [Fixture.display("a", id: 1), Fixture.display("b", id: 2, isPrimary: false)]
+        let first = Fixture.asset()
+        let second = Fixture.asset()
+        let placements = [
+            WallpaperPlacement(assetID: first.id, scope: .allDisplays),
+            WallpaperPlacement(assetID: second.id, scope: .specificDisplay("b"))
+        ]
+
+        await manager.reconcile(Fixture.request(displays: displays, assets: [first, second], placements: placements))
+
+        XCTAssertEqual(environment.engines.count, 2)
+        XCTAssertTrue(environment.engines.allSatisfy { $0.attachedCount == 1 && $0.isPlaying })
+        await assertNoLeaks(expectedSessions: 2)
+    }
+
+    func testSharedEngineKeepsDecodingWhileAnyDisplayAnimates() async {
+        let displays = [Fixture.display("a", id: 1), Fixture.display("b", id: 2, isPrimary: false)]
+        let asset = Fixture.asset()
+
+        await manager.reconcile(Fixture.request(displays: displays, assets: [asset]))
+        let engine = environment.engines[0]
+
+        // Cover one display: it freezes, the other keeps playing.
+        environment.windowSnapshot = WindowListSnapshot(
+            windows: [WindowInfo(ownerPID: 1, layer: 0, alpha: 1, bounds: displays[1].frame.insetBy(dx: 20, dy: 12))]
+        )
+        manager.reevaluate(reason: "test")
+        await manager.waitUntilIdle()
+        XCTAssertTrue(engine.isPlaying)
+        XCTAssertEqual(engine.liveCount, 1)
+
+        // Cover both: decoding stops, nothing is torn down.
+        environment.windowSnapshot = WindowListSnapshot(
+            windows: displays.map { WindowInfo(ownerPID: 1, layer: 0, alpha: 1, bounds: $0.frame.insetBy(dx: 20, dy: 12)) }
+        )
+        manager.reevaluate(reason: "test")
+        await manager.waitUntilIdle()
+        XCTAssertFalse(engine.isPlaying)
+        XCTAssertEqual(engine.liveCount, 0)
+        XCTAssertTrue(engine.isLoaded)
+        XCTAssertEqual(manager.currentSessions.map(\.modeReason), [.occluded, .occluded])
+
+        environment.windowSnapshot = WindowListSnapshot(windows: [])
+        manager.reevaluate(reason: "test")
+        await manager.waitUntilIdle()
+        XCTAssertTrue(engine.isPlaying)
+        XCTAssertEqual(engine.prepareAttempts.count, 1, "resuming does not reload the video")
+    }
+
+    func testInvisibleStatesSuspendRegardlessOfPreferences() async {
+        let display = Fixture.display()
+        let asset = Fixture.asset()
+        var preferences = UserPreferences.defaultValue
+        preferences.pauseWhenOccluded = false
+        preferences.pauseWhenFullscreen = false
+        preferences.reduceOnBattery = false
+
+        let invisibleStates: [(SessionModeReason, (inout AppRuntimeState) -> Void)] = [
+            (.screenLocked, { $0.isScreenLocked = true }),
+            (.screenSaver, { $0.isScreenSaverActive = true }),
+            (.displaysAsleep, { $0.displaysAsleep = true }),
+            (.sessionInactive, { $0.isSessionInactive = true }),
+            (.systemSleeping, { $0.sleepState = .sleeping })
+        ]
+
+        for (reason, configure) in invisibleStates {
+            await manager.reconcile(Fixture.request(displays: [display], assets: [asset], preferences: preferences))
+            XCTAssertTrue(environment.engines[0].isPlaying)
+
+            await manager.reconcile(
+                Fixture.request(displays: [display], assets: [asset], preferences: preferences, configure: configure)
+            )
+
+            XCTAssertFalse(environment.engines[0].isPlaying, "\(reason) must stop decoding")
+            XCTAssertEqual(manager.currentSessions.first?.modeReason, reason)
+            XCTAssertEqual(manager.currentSessions.first?.energyMode, .suspend)
+        }
+    }
+
+    func testSleepAndWakeKeepWindowsAndPlayers() async {
+        let displays = [Fixture.display("a", id: 1), Fixture.display("b", id: 2, isPrimary: false)]
+        let asset = Fixture.asset()
+
+        await manager.reconcile(Fixture.request(displays: displays, assets: [asset]))
+        let capturesBeforeSleep = environment.windowSnapshotCaptureCount
+
+        await manager.reconcile(Fixture.request(displays: displays, assets: [asset]) { $0.sleepState = .sleeping })
+
+        XCTAssertEqual(environment.openSurfaces.count, 2, "windows survive sleep")
+        XCTAssertTrue(environment.openSurfaces.allSatisfy(\.isWindowShown), "the wallpaper is on screen the instant the Mac wakes")
+        XCTAssertTrue(environment.engines[0].isLoaded, "on AC power the player is kept, only paused")
+        XCTAssertFalse(environment.engines[0].isPlaying)
+        XCTAssertEqual(environment.windowSnapshotCaptureCount, capturesBeforeSleep, "no window-list query while asleep")
+
+        await manager.reconcile(Fixture.request(displays: displays, assets: [asset]))
+
+        XCTAssertEqual(environment.surfaces.count, 2, "nothing was rebuilt")
+        XCTAssertEqual(environment.engines.count, 1)
+        XCTAssertEqual(environment.engines[0].prepareAttempts.count, 1)
+        XCTAssertTrue(environment.engines[0].isPlaying)
+    }
+
+    func testSleepOnBatteryReleasesPlayerButKeepsWindows() async {
+        let display = Fixture.display()
+        let asset = Fixture.asset()
+
+        await manager.reconcile(Fixture.request(displays: [display], assets: [asset]))
+        await manager.reconcile(Fixture.request(displays: [display], assets: [asset]) {
+            $0.sleepState = .sleeping
+            $0.powerSource = .battery
+        })
+        await Task.yield()
+        await manager.waitUntilIdle()
+        await manager.waitUntilIdle()
+
+        XCTAssertFalse(environment.engines[0].isLoaded)
+        XCTAssertEqual(environment.openSurfaces.count, 1)
+        XCTAssertTrue(environment.openSurfaces[0].isWindowShown)
+    }
+
+    func testUserPauseFreezesFrameWithoutUnloading() async {
+        let display = Fixture.display()
+        let asset = Fixture.asset()
+
+        await manager.reconcile(Fixture.request(displays: [display], assets: [asset]))
+        await manager.reconcile(Fixture.request(displays: [display], assets: [asset]) { $0.isUserPaused = true })
+
+        XCTAssertFalse(environment.engines[0].isPlaying)
+        XCTAssertTrue(environment.engines[0].isLoaded)
+        XCTAssertTrue(environment.surfaces[0].isShowingVideo, "the current frame stays on screen instead of jumping to the poster")
+        XCTAssertEqual(manager.currentSessions.first?.modeReason, .userPaused)
+        XCTAssertEqual(manager.currentSessions.first?.playbackState, .poster)
+    }
+
+    func testPlaybackFailureAfterStartFallsBackToOriginal() async {
+        let display = Fixture.display()
+        let asset = Fixture.asset()
+
+        await manager.reconcile(Fixture.request(displays: [display], assets: [asset]))
+        XCTAssertEqual(manager.currentSessions.first?.playbackSource, .optimized)
+
+        environment.engines[0].onPlaybackFailure?()
+        await manager.waitUntilIdle()
+        await manager.waitUntilIdle()
+
+        XCTAssertEqual(manager.currentSessions.first?.playbackSource, .original)
+        XCTAssertEqual(manager.currentSessions.first?.playbackState, .animating)
+        await assertNoLeaks(expectedSessions: 1)
+    }
+
+    func testNewRenditionIsSwitchedInWithoutTearingPlaybackDown() async {
+        let display = Fixture.display()
+        var asset = Fixture.asset()
+
+        await manager.reconcile(Fixture.request(displays: [display], assets: [asset]))
+        let engine = environment.engines[0]
+        engine.currentTime = 7
+
+        let assetID = asset.id
+        asset.optimizedPlayback?.relativePath = "OptimizedVideos/\(assetID.uuidString)-2.mp4"
+        asset.optimizedPlayback?.pixelSize = CGSize(width: 3840, height: 2160)
+        await manager.reconcile(Fixture.request(displays: [display], assets: [asset]))
+
+        XCTAssertEqual(engine.teardownCount, 0, "the engine swaps sources itself; playback is never torn down")
+        XCTAssertEqual(engine.preparedURL, FakeEnvironment.optimizedURL(for: asset))
+        XCTAssertEqual(engine.startTimes.last, 7, "the new rendition continues from the same position")
+        XCTAssertEqual(environment.surfaces.count, 1)
+        XCTAssertTrue(engine.isPlaying)
+        XCTAssertEqual(manager.currentSessions.first?.videoPixelSize, CGSize(width: 3840, height: 2160))
+    }
+
+    func testFailedNewRenditionKeepsCurrentPlayback() async {
+        let display = Fixture.display()
+        var asset = Fixture.asset()
+
+        await manager.reconcile(Fixture.request(displays: [display], assets: [asset]))
+        let engine = environment.engines[0]
+        let originalURL = FakeEnvironment.optimizedURL(for: asset)
+
+        asset.optimizedPlayback?.relativePath = "OptimizedVideos/broken.mp4"
+        environment.failingURLs = [FakeEnvironment.optimizedURL(for: asset)]
+        await manager.reconcile(Fixture.request(displays: [display], assets: [asset]))
+
+        XCTAssertEqual(engine.preparedURL, originalURL)
+        XCTAssertTrue(engine.isPlaying)
+        await assertNoLeaks(expectedSessions: 1)
     }
 }

@@ -9,6 +9,20 @@ struct SystemContext: Sendable {
     var assetIsHeavy: Bool
     var isPrimaryDisplay: Bool
     var activeDisplayCount: Int
+
+    // Nobody can see the desktop in these states.
+    var isSystemSleeping = false
+    var isScreenLocked = false
+    var displaysAsleep = false
+    var isScreenSaverActive = false
+    var isSessionInactive = false
+
+    var isUserPaused = false
+    var reduceMotionEnabled = false
+
+    var isInvisibleToUser: Bool {
+        isSystemSleeping || isScreenLocked || displaysAsleep || isScreenSaverActive || isSessionInactive
+    }
 }
 
 enum SessionMode: String, Sendable {
@@ -46,12 +60,42 @@ final class EnergyPolicyController: Sendable {
     }
 
     func decision(for context: SystemContext, preferences: UserPreferences) -> SessionModeDecision {
+        // Unconditional: when nobody can see the desktop no frame is decoded,
+        // whatever the preferences say.
+        if context.isSystemSleeping {
+            return SessionModeDecision(mode: .suspend, reason: .systemSleeping)
+        }
+
+        if context.isScreenLocked {
+            return SessionModeDecision(mode: .suspend, reason: .screenLocked)
+        }
+
+        if context.displaysAsleep {
+            return SessionModeDecision(mode: .suspend, reason: .displaysAsleep)
+        }
+
+        if context.isScreenSaverActive {
+            return SessionModeDecision(mode: .suspend, reason: .screenSaver)
+        }
+
+        if context.isSessionInactive {
+            return SessionModeDecision(mode: .suspend, reason: .sessionInactive)
+        }
+
+        if context.isUserPaused {
+            return SessionModeDecision(mode: .poster, reason: .userPaused)
+        }
+
         if context.isFullscreen && preferences.pauseWhenFullscreen {
             return SessionModeDecision(mode: .suspend, reason: .fullscreen)
         }
 
         if context.isOccluded && preferences.pauseWhenOccluded {
             return SessionModeDecision(mode: .suspend, reason: .occluded)
+        }
+
+        if context.reduceMotionEnabled && preferences.pauseWhenReduceMotion {
+            return SessionModeDecision(mode: .poster, reason: .reduceMotion)
         }
 
         if context.thermalState == .critical {
@@ -120,6 +164,12 @@ final class EnergyPolicyController: Sendable {
 
         if preferences.fallbackMode == .batterySaver && !context.isPrimaryDisplay {
             return .seconds(12)
+        }
+
+        // Locked, asleep or switched away while on battery: the pipeline is
+        // unlikely to be needed soon, so its memory and decoder are released.
+        if context.isInvisibleToUser && (context.onBattery || context.lowPowerMode) {
+            return .seconds(30)
         }
 
         return nil

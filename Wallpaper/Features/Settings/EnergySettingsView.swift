@@ -6,17 +6,17 @@ struct EnergySettingsView: View {
     var body: some View {
         WallpaperPageScrollView {
             WallpaperPageHeader(
-                "Energia",
-                subtitle: "Refine como o wallpaper reage a bateria, oclusao e estados que exigem menos processamento."
+                String(localized: "Energy"),
+                subtitle: String(localized: "How the wallpaper reacts to battery power, covered desktops and fullscreen apps.")
             )
 
             WallpaperSectionCard(
-                "Politicas automaticas",
-                subtitle: "Essas opcoes ajudam a reduzir atividade quando o sistema esta em contextos sensiveis."
+                String(localized: "Automatic policies"),
+                subtitle: String(localized: "The wallpaper always stops while the screen is locked, the displays are asleep or the screen saver is running. These options add to that.")
             ) {
                 VStack(alignment: .leading, spacing: 14) {
                     Toggle(
-                        "Reduzir atividade na bateria",
+                        "Reduce activity on battery",
                         isOn: Binding(
                             get: { coordinator.preferences.reduceOnBattery },
                             set: { coordinator.updateReduceOnBattery($0) }
@@ -26,7 +26,7 @@ struct EnergySettingsView: View {
                     Divider()
 
                     Toggle(
-                        "Pausar quando o display estiver totalmente ocluido",
+                        "Pause when the desktop is completely covered",
                         isOn: Binding(
                             get: { coordinator.preferences.pauseWhenOccluded },
                             set: { coordinator.updatePauseWhenOccluded($0) }
@@ -36,29 +36,40 @@ struct EnergySettingsView: View {
                     Divider()
 
                     Toggle(
-                        "Pausar ao entrar em fullscreen",
+                        "Pause while an app is in fullscreen",
                         isOn: Binding(
                             get: { coordinator.preferences.pauseWhenFullscreen },
                             set: { coordinator.updatePauseWhenFullscreen($0) }
                         )
                     )
+
+                    Divider()
+
+                    Toggle(
+                        "Show a still frame when Reduce Motion is on",
+                        isOn: Binding(
+                            get: { coordinator.preferences.pauseWhenReduceMotion },
+                            set: { coordinator.updatePauseWhenReduceMotion($0) }
+                        )
+                    )
+                    .help(Text("Follows the Reduce Motion setting in System Settings › Accessibility › Display."))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             WallpaperSectionCard(
-                "Perfil energetico",
-                subtitle: "Escolha a estrategia de fallback aplicada quando o sistema pedir um modo mais conservador."
+                String(localized: "Energy profile"),
+                subtitle: String(localized: "Battery saver also keeps secondary displays on a still frame while on battery.")
             ) {
                 Picker(
-                    "Perfil energetico",
+                    "Energy profile",
                     selection: Binding(
                         get: { coordinator.preferences.fallbackMode },
                         set: { coordinator.updateFallbackMode($0) }
                     )
                 ) {
                     Text("Balanced").tag(UserPreferences.FallbackMode.balanced)
-                    Text("Battery Saver").tag(UserPreferences.FallbackMode.batterySaver)
+                    Text("Battery saver").tag(UserPreferences.FallbackMode.batterySaver)
                 }
                 .pickerStyle(.menu)
             }

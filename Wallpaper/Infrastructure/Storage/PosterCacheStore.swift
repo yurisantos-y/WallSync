@@ -3,7 +3,14 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
+struct StoredPoster: Sendable, Equatable {
+    var posterPath: String
+    var thumbnailPath: String?
+}
+
 actor PosterCacheStore {
+    static let thumbnailMaximumDimension: CGFloat = 480
+
     private let storage: StorageLocations
     private let memoryCache = NSCache<NSString, CGImageBox>()
 
@@ -13,12 +20,26 @@ actor PosterCacheStore {
         memoryCache.totalCostLimit = 96 * 1024 * 1024
     }
 
-    func savePoster(_ box: CGImageBox, for assetID: UUID) throws -> String {
+    /// Writes the full-size poster and a small library thumbnail, both HEIC
+    /// (a fraction of the size of PNG for photographic frames), straight from
+    /// the `CGImage` — no TIFF round trip. Posters written as PNG by earlier
+    /// versions keep loading through `loadPoster`.
+    func savePoster(_ box: CGImageBox, for assetID: UUID) throws -> StoredPoster {
         let image = box.image
-        let relativePath = "\(StorageLocations.postersDirectoryName)/\(assetID.uuidString).png"
-        try Self.write(image, to: storage.url(forRelativePath: relativePath), type: .png)
-        memoryCache.setObject(CGImageBox(image), forKey: relativePath as NSString, cost: image.memoryCost)
-        return relativePath
+        let directory = StorageLocations.postersDirectoryName
+        let posterPath = "\(directory)/\(assetID.uuidString).heic"
+        try Self.write(image, to: storage.url(forRelativePath: posterPath), type: .heic, quality: 0.9)
+        memoryCache.setObject(box, forKey: posterPath as NSString, cost: image.memoryCost)
+
+        var thumbnailPath: String?
+        if let thumbnail = Self.downscaled(image, maximumDimension: Self.thumbnailMaximumDimension) {
+            let path = "\(directory)/\(assetID.uuidString)-thumb.heic"
+            if (try? Self.write(thumbnail, to: storage.url(forRelativePath: path), type: .heic, quality: 0.8)) != nil {
+                thumbnailPath = path
+            }
+        }
+
+        return StoredPoster(posterPath: posterPath, thumbnailPath: thumbnailPath)
     }
 
     func loadPoster(relativePath: String?) -> CGImageBox? {
@@ -65,6 +86,26 @@ actor PosterCacheStore {
         }
 
         _ = try FileManager.default.replaceItemAt(url, withItemAt: temporaryURL)
+    }
+
+    /// Returns a copy no larger than `maximumDimension` on its longest side.
+    static func downscaled(_ image: CGImage, maximumDimension: CGFloat) -> CGImage? {
+        let longest = CGFloat(max(image.width, image.height))
+        guard longest > 0 else { return nil }
+        let scale = min(1, maximumDimension / longest)
+        let width = max(1, Int((CGFloat(image.width) * scale).rounded()))
+        let height = max(1, Int((CGFloat(image.height) * scale).rounded()))
+
+        guard let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                space: colorSpace, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+              ) else {
+            return nil
+        }
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()
     }
 }
 
