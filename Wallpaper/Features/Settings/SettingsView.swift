@@ -1,543 +1,257 @@
+import AppKit
 import SwiftUI
 
+/// Every preference on one page, grouped by the question it answers. The
+/// last groups are the diagnostics: what each display is doing and why.
 struct SettingsView: View {
     @Environment(AppCoordinator.self) private var coordinator
-    @State private var selection: SettingsDestination = .library
-    @State private var isDropTargeted = false
+    @State private var didCopy = false
+
+    private var preferences: UserPreferences { coordinator.preferences }
+    private var dimming: DimmingSettings { coordinator.preferences.dimming }
 
     var body: some View {
-        NavigationSplitView {
-            WallpaperSidebar(selection: $selection)
-                .navigationSplitViewColumnWidth(min: 250, ideal: 280, max: 320)
-        } detail: {
-            ZStack {
-                WallpaperWindowBackground()
-                detailView(for: selection)
+        Form {
+            startupSection
+            dimmingSection
+            qualitySection
+            pauseSection
+            batterySection
+            diagnosticsSections
+        }
+        .formStyle(.grouped)
+        .navigationTitle("Settings")
+        .onChange(of: coordinator.activeSessions) {
+            didCopy = false
+        }
+    }
+
+    private func footnote(_ text: Text) -> some View {
+        text
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - Startup
+
+    private var startupSection: some View {
+        Section("Startup") {
+            Toggle(
+                isOn: Binding(
+                    get: { preferences.launchAtLogin },
+                    set: { coordinator.updateLaunchAtLogin($0) }
+                )
+            ) {
+                Text("Open WallSync at login")
+                if coordinator.startupLoginState == .requiresApproval {
+                    Text("Waiting for approval in System Settings")
+                        .foregroundStyle(.orange)
+                }
             }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if let message = coordinator.lastErrorMessage {
-                    ErrorBanner(message: message) {
-                        coordinator.dismissError()
+
+            Toggle(
+                "Start wallpapers when the app opens",
+                isOn: Binding(
+                    get: { preferences.startOnLaunch },
+                    set: { coordinator.updateStartOnLaunch($0) }
+                )
+            )
+        }
+    }
+
+    // MARK: - Dimming
+
+    private var dimmingSection: some View {
+        Section {
+            Slider(
+                value: Binding(
+                    get: { dimming.amount },
+                    set: { value in coordinator.updateDimming { $0.amount = value } }
+                ),
+                in: 0...DimmingSettings.maximum,
+                step: 0.05
+            ) {
+                Text("Dimming")
+                Text(dimming.amount.formatted(.percent.precision(.fractionLength(0))))
+                    .monospacedDigit()
+            }
+            .accessibilityValue(Text(dimming.amount.formatted(.percent.precision(.fractionLength(0)))))
+
+            Toggle(
+                isOn: Binding(
+                    get: { dimming.dimMoreInDarkMode },
+                    set: { value in coordinator.updateDimming { $0.dimMoreInDarkMode = value } }
+                )
+            ) {
+                Text("Dim more in dark mode")
+                Text("Adds extra dimming while macOS uses the dark appearance, and removes it in the light appearance.")
+            }
+
+            Toggle(
+                "Tint with a color",
+                isOn: Binding(
+                    get: { dimming.tint != nil },
+                    set: { value in
+                        coordinator.updateDimming { $0.tint = value ? ($0.tint ?? RGBColor(red: 0.05, green: 0.08, blue: 0.2)) : nil }
                     }
-                    .padding(.horizontal, 32)
-                    .padding(.top, 14)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .animation(.easeOut(duration: 0.2), value: coordinator.lastErrorMessage)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .navigationSplitViewStyle(.balanced)
-        .background(WallpaperWindowBackground())
-        // Video files can be dropped anywhere on the window.
-        .dropDestination(for: URL.self) { urls, _ in
-            let videos = urls.filter(AssetImportPipeline.isImportable)
-            guard !videos.isEmpty else { return false }
-            coordinator.importVideos(at: videos)
-            selection = .library
-            return true
-        } isTargeted: { isDropTargeted = $0 }
-        .overlay {
-            if isDropTargeted {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 3, dash: [10, 6]))
-                    .padding(10)
-                    .allowsHitTesting(false)
-            }
-        }
-    }
+                )
+            )
 
-    @ViewBuilder
-    private func detailView(for destination: SettingsDestination) -> some View {
-        switch destination {
-        case .library:
-            LibraryView()
-        case .displays:
-            DisplaysView()
-        case .playlists:
-            PlaylistsView()
-        case .general:
-            GeneralSettingsView()
-        case .energy:
-            EnergySettingsView()
-        case .startup:
-            StartupSettingsView()
-        case .diagnostics:
-            DiagnosticsSettingsView()
-        }
-    }
-}
-
-enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
-    case library
-    case displays
-    case playlists
-    case general
-    case energy
-    case startup
-    case diagnostics
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .library:
-            return String(localized: "Library")
-        case .displays:
-            return String(localized: "Displays")
-        case .playlists:
-            return String(localized: "Playlists")
-        case .general:
-            return String(localized: "General")
-        case .energy:
-            return String(localized: "Energy")
-        case .startup:
-            return String(localized: "Startup")
-        case .diagnostics:
-            return String(localized: "Diagnostics")
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .library:
-            return String(localized: "Your videos and the wallpaper for all displays.")
-        case .displays:
-            return String(localized: "A wallpaper for each display.")
-        case .playlists:
-            return String(localized: "Wallpapers that change by themselves.")
-        case .general:
-            return String(localized: "App behavior and playback quality.")
-        case .energy:
-            return String(localized: "Battery, covered desktop and fullscreen.")
-        case .startup:
-            return String(localized: "Open at login.")
-        case .diagnostics:
-            return String(localized: "Live state of every display.")
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .library:
-            return "film.stack"
-        case .displays:
-            return "display.2"
-        case .playlists:
-            return "rectangle.stack"
-        case .general:
-            return "gearshape"
-        case .energy:
-            return "bolt"
-        case .startup:
-            return "power"
-        case .diagnostics:
-            return "stethoscope"
-        }
-    }
-
-    var group: SidebarGroup {
-        switch self {
-        case .library, .displays, .playlists:
-            return .workspace
-        case .general, .energy, .startup, .diagnostics:
-            return .preferences
-        }
-    }
-}
-
-enum SidebarGroup: String, CaseIterable, Identifiable {
-    case workspace
-    case preferences
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .workspace:
-            return String(localized: "Wallpapers")
-        case .preferences:
-            return String(localized: "Settings")
-        }
-    }
-
-    var destinations: [SettingsDestination] {
-        SettingsDestination.allCases.filter { $0.group == self }
-    }
-}
-
-struct WallpaperSidebar: View {
-    @Binding var selection: SettingsDestination
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .top, spacing: 14) {
-                Image("BrandLogo")
-                    .resizable()
-                    .interpolation(.high)
-                    .frame(width: 44, height: 44)
-                    .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 6)
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("WallSync")
-                        .font(.title2.weight(.semibold))
-                    Text("Animated wallpapers, in sync on every display.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-
-            List {
-                ForEach(SidebarGroup.allCases) { group in
-                    Section(group.title) {
-                        ForEach(group.destinations) { destination in
-                            Button {
-                                selection = destination
-                            } label: {
-                                SidebarDestinationRow(
-                                    destination: destination,
-                                    isSelected: selection == destination
+            if let tint = dimming.tint {
+                ColorPicker(
+                    "Tint color",
+                    selection: Binding(
+                        get: { Color(.sRGB, red: tint.red, green: tint.green, blue: tint.blue) },
+                        set: { color in
+                            guard let resolved = NSColor(color).usingColorSpace(.sRGB) else { return }
+                            coordinator.updateDimming {
+                                $0.tint = RGBColor(
+                                    red: resolved.redComponent, green: resolved.greenComponent, blue: resolved.blueComponent
                                 )
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(Text(destination.title))
-                            .accessibilityHint(Text(destination.subtitle))
-                            .accessibilityAddTraits(selection == destination ? .isSelected : [])
-                            .listRowInsets(EdgeInsets(top: 2, leading: 10, bottom: 2, trailing: 10))
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
                         }
-                    }
-                }
-            }
-            .listStyle(.sidebar)
-            .scrollContentBackground(.hidden)
-            .background(Color.clear)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background {
-            ZStack(alignment: .trailing) {
-                Rectangle()
-                    .fill(.thinMaterial)
-                LinearGradient(
-                    colors: [
-                        Color.white.opacity(colorScheme == .dark ? 0.06 : 0.34),
-                        Color.accentColor.opacity(colorScheme == .dark ? 0.03 : 0.06)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                    ),
+                    supportsOpacity: false
                 )
-                Rectangle()
-                    .fill(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.42))
-                    .frame(width: 1)
             }
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
+        } header: {
+            Text("Dimming")
+        } footer: {
+            footnote(Text("Darkens every wallpaper so icons and widgets stay easy to read. Each wallpaper can have its own value in the library."))
         }
     }
-}
 
-private struct SidebarDestinationRow: View {
-    let destination: SettingsDestination
-    let isSelected: Bool
+    // MARK: - Quality
 
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: destination.systemImage)
-                .font(.system(size: 14, weight: .semibold))
-                .frame(width: 18)
-
-            Text(destination.title)
-                .font(.system(size: 13, weight: .medium))
-
-            Spacer(minLength: 0)
+    private var qualitySection: some View {
+        Section {
+            Picker(
+                "Playback quality",
+                selection: Binding(
+                    get: { preferences.playbackQuality },
+                    set: { coordinator.updatePlaybackQuality($0) }
+                )
+            ) {
+                Text("Efficiency (up to 30 fps)").tag(UserPreferences.PlaybackQuality.efficiency)
+                Text("Smoothness (up to 60 fps)").tag(UserPreferences.PlaybackQuality.smooth)
+            }
+        } header: {
+            Text("Playback quality")
+        } footer: {
+            footnote(Text("Efficiency uses the least energy. Smoothness keeps up to 60 frames per second and roughly doubles the decoding work; on battery, 60 fps videos are shown as a still frame when “Reduce activity on battery” is on."))
         }
-        .foregroundStyle(isSelected ? .primary : .secondary)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .background(selectionBackground)
     }
+
+    // MARK: - Energy
+
+    private var pauseSection: some View {
+        Section {
+            Toggle(
+                "Pause when the desktop is completely covered",
+                isOn: Binding(
+                    get: { preferences.pauseWhenOccluded },
+                    set: { coordinator.updatePauseWhenOccluded($0) }
+                )
+            )
+
+            Toggle(
+                "Pause while an app is in fullscreen",
+                isOn: Binding(
+                    get: { preferences.pauseWhenFullscreen },
+                    set: { coordinator.updatePauseWhenFullscreen($0) }
+                )
+            )
+
+            Toggle(
+                isOn: Binding(
+                    get: { preferences.pauseWhenReduceMotion },
+                    set: { coordinator.updatePauseWhenReduceMotion($0) }
+                )
+            ) {
+                Text("Show a still frame when Reduce Motion is on")
+                Text("Follows the Reduce Motion setting in System Settings › Accessibility › Display.")
+            }
+        } header: {
+            Text("Energy")
+        } footer: {
+            footnote(Text("The wallpaper always stops while the screen is locked, the displays are asleep or the screen saver is running. These options add to that."))
+        }
+    }
+
+    private var batterySection: some View {
+        Section("On battery") {
+            Toggle(
+                isOn: Binding(
+                    get: { preferences.reduceOnBattery },
+                    set: { coordinator.updateReduceOnBattery($0) }
+                )
+            ) {
+                Text("Reduce activity on battery")
+                Text("Demanding videos, such as 60 fps ones, show a still frame.")
+            }
+
+            Toggle(
+                isOn: Binding(
+                    get: { preferences.fallbackMode == .batterySaver },
+                    set: { coordinator.updateFallbackMode($0 ? .batterySaver : .balanced) }
+                )
+            ) {
+                Text("Animate only the main display")
+                Text("The other displays show a still frame.")
+            }
+        }
+    }
+
+    // MARK: - Diagnostics
 
     @ViewBuilder
-    private var selectionBackground: some View {
-        if isSelected {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.14))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(Color.white.opacity(colorScheme == .dark ? 0.10 : 0.30), lineWidth: 0.8)
-                }
-        } else {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.clear)
-        }
-    }
-}
-
-struct WallpaperWindowBackground: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        ZStack {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-
-            LinearGradient(
-                colors: backgroundGradient,
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+    private var diagnosticsSections: some View {
+        Section {
+            row(Text("Version"), AppCoordinator.appVersion)
+            row(Text("Power source"), coordinator.runtimeState.powerSource.localizedLabel)
+            row(
+                Text("Low Power Mode"),
+                coordinator.runtimeState.lowPowerMode ? String(localized: "On") : String(localized: "Off")
             )
-            .opacity(colorScheme == .dark ? 0.96 : 0.92)
-
-            Circle()
-                .fill(Color.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.16))
-                .frame(width: 420, height: 420)
-                .blur(radius: 130)
-                .offset(x: -300, y: -260)
-
-            Circle()
-                .fill(Color.orange.opacity(colorScheme == .dark ? 0.16 : 0.11))
-                .frame(width: 360, height: 360)
-                .blur(radius: 120)
-                .offset(x: 310, y: -180)
-
-            Circle()
-                .fill(Color.white.opacity(colorScheme == .dark ? 0.08 : 0.26))
-                .frame(width: 520, height: 520)
-                .blur(radius: 170)
-                .offset(x: 200, y: 320)
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-    }
-
-    private var backgroundGradient: [Color] {
-        if colorScheme == .dark {
-            return [
-                Color(red: 0.08, green: 0.10, blue: 0.13),
-                Color(red: 0.09, green: 0.14, blue: 0.18),
-                Color(red: 0.13, green: 0.12, blue: 0.10)
-            ]
-        }
-
-        return [
-            Color(red: 0.88, green: 0.92, blue: 0.97),
-            Color(red: 0.95, green: 0.96, blue: 0.98),
-            Color(red: 0.98, green: 0.95, blue: 0.91)
-        ]
-    }
-}
-
-struct WallpaperPageScrollView<Content: View>: View {
-    @ViewBuilder private let content: Content
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                content
-            }
-            .frame(maxWidth: 1040, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 32)
-            .padding(.vertical, 28)
-        }
-        .scrollIndicators(.hidden)
-    }
-}
-
-struct WallpaperPageHeader: View {
-    private let title: String
-    private let subtitle: String
-    private let accessory: AnyView
-
-    init(_ title: String, subtitle: String) {
-        self.title = title
-        self.subtitle = subtitle
-        accessory = AnyView(EmptyView())
-    }
-
-    init<Accessory: View>(_ title: String, subtitle: String, @ViewBuilder accessory: () -> Accessory) {
-        self.title = title
-        self.subtitle = subtitle
-        self.accessory = AnyView(accessory())
-    }
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.largeTitle.weight(.bold))
-                Text(subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 16)
-
-            accessory
-        }
-    }
-}
-
-struct WallpaperGlassCard<Content: View>: View {
-    private let padding: CGFloat
-    private let cornerRadius: CGFloat
-    @ViewBuilder private let content: Content
-
-    @Environment(\.colorScheme) private var colorScheme
-
-    init(
-        padding: CGFloat = 20,
-        cornerRadius: CGFloat = 24,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.padding = padding
-        self.cornerRadius = cornerRadius
-        self.content = content()
-    }
-
-    var body: some View {
-        content
-            .padding(padding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                ZStack {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(.ultraThinMaterial)
-
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Color.white.opacity(colorScheme == .dark ? 0.04 : 0.26))
-
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(colorScheme == .dark ? 0.10 : 0.42),
-                                    Color.white.opacity(0.02),
-                                    Color.accentColor.opacity(colorScheme == .dark ? 0.05 : 0.07)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                    )
+            row(Text("Thermal state"), coordinator.runtimeState.thermalState.localizedLabel)
+        } header: {
+            HStack {
+                Text("Diagnostics")
+                Spacer()
+                Button(didCopy ? String(localized: "Copied") : String(localized: "Copy summary")) {
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(coordinator.diagnosticsSummary(), forType: .string)
+                    didCopy = true
                 }
-                .allowsHitTesting(false)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(
-                        Color.white.opacity(colorScheme == .dark ? 0.14 : 0.55),
-                        lineWidth: 1
-                    )
-                    .allowsHitTesting(false)
-            }
-            .shadow(
-                color: Color.black.opacity(colorScheme == .dark ? 0.30 : 0.12),
-                radius: 24,
-                x: 0,
-                y: 12
-            )
-    }
-}
-
-struct WallpaperSectionCard<Content: View>: View {
-    private let title: String
-    private let subtitle: String?
-    @ViewBuilder private let content: Content
-
-    init(
-        _ title: String,
-        subtitle: String? = nil,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.title = title
-        self.subtitle = subtitle
-        self.content = content()
-    }
-
-    var body: some View {
-        WallpaperGlassCard {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.title3.weight(.semibold))
-                    if let subtitle {
-                        Text(subtitle)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                content
+                .controlSize(.small)
+                .help(Text("Copies a text report of the current state to the clipboard."))
             }
         }
-    }
-}
 
-struct WallpaperStatusPill: View {
-    let label: String
-    let color: Color
-
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        Text(label)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(color.opacity(colorScheme == .dark ? 0.20 : 0.12))
-            )
-            .overlay {
-                Capsule(style: .continuous)
-                    .stroke(color.opacity(colorScheme == .dark ? 0.28 : 0.18), lineWidth: 0.8)
-            }
-            .foregroundStyle(color)
-    }
-}
-
-/// Shows the latest error on every page until the user dismisses it.
-struct ErrorBanner: View {
-    let message: String
-    let onDismiss: () -> Void
-
-    var body: some View {
-        WallpaperGlassCard(padding: 14, cornerRadius: 18) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-                    .accessibilityHidden(true)
-
-                Text(message)
-                    .font(.subheadline.weight(.medium))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Button {
-                    onDismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
+        ForEach(coordinator.runtimeState.activeDisplays) { display in
+            Section(display.localizedName) {
+                if let session = coordinator.session(for: display) {
+                    row(Text("Energy mode"), session.energyMode.localizedLabel)
+                    row(Text("Reason"), session.modeReason.localizedLabel)
+                    row(Text("Playback"), session.playbackState.localizedLabel)
+                    row(Text("Video source"), session.playbackSource.localizedLabel)
+                    row(Text("Decoded stream"), DiagnosticsSummary.videoDescription(for: session))
+                } else {
+                    Text("No active session")
                         .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(Text("Dismiss"))
-                .help(Text("Dismiss"))
             }
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(Text("Error"))
+    }
+
+    private func row(_ title: Text, _ value: String) -> some View {
+        LabeledContent {
+            Text(value)
+                .monospacedDigit()
+                .textSelection(.enabled)
+        } label: {
+            title
+        }
     }
 }

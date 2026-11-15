@@ -8,11 +8,10 @@ struct WallpaperApp: App {
         WindowGroup("WallSync", id: "main") {
             MainWindowSceneView()
                 .environment(appDelegate.coordinator)
-                .frame(minWidth: 1080, minHeight: 720)
+                .frame(minWidth: 780, minHeight: 520)
         }
-        .defaultSize(width: 1180, height: 780)
-        .windowStyle(.hiddenTitleBar)
-        .windowToolbarStyle(.unified(showsTitle: false))
+        .defaultSize(width: 1040, height: 680)
+        .windowToolbarStyle(.unified)
         .commands {
             CommandGroup(replacing: .newItem) { }
         }
@@ -24,7 +23,7 @@ private struct MainWindowSceneView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        SettingsView()
+        MainWindowView()
             .task {
                 coordinator.registerOpenMainWindowAction {
                     openWindow(id: "main")

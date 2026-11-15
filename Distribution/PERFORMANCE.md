@@ -10,7 +10,7 @@ development is the right thing to measure.
 | --- | --- | --- |
 | Unified log | subsystem `com.yurisantos.wallpaper` | Every mode change, with the reason and the trigger |
 | Signposts | same subsystem, category `performance` | Duration of reconciles, window-list queries, playback preparation, transcodes, poster generation, and the intervals during which a video is being decoded |
-| Diagnostics pane | Settings › Diagnostics | Per display: energy mode, reason, playback state, video source, decoded resolution / fps / codec. **Copy summary** puts a text report on the clipboard |
+| Diagnostics | Settings › Diagnostics (bottom of the page) | Per display: energy mode, reason, playback state, video source, decoded resolution / fps / codec. **Copy summary** puts a text report on the clipboard |
 | MetricKit | log category `metrics` | Daily energy / CPU / hang / crash payloads delivered by the system |
 
 Log categories: `session`, `playback`, `energy`, `import`, `storage`, `metrics`.
@@ -81,7 +81,7 @@ checklist.
 | 6 | Display asleep | Let the display sleep (`pmset displaysleepnow`) | `reason=displaysAsleep`, `decoding stopped` |
 | 7 | Battery | Unplug the charger | `power_changed` reconcile in under a second; heavy assets switch to a still frame when "Reduce activity on battery" is on |
 | 8 | Sleep / wake | Close the lid, reopen | No window is destroyed; the wallpaper is on screen immediately after wake |
-| 9 | Dimming | Scenario 1, then scenario 2, each with Settings › General › Dimming at 0% and at 40% | App CPU unchanged (the dimming layer costs the app nothing per frame). Compare **WindowServer** CPU and GPU power between 0% and 40%: the difference decides whether dimming stays a layer or has to be baked into the rendition |
+| 9 | Dimming | Scenario 1, then scenario 2, each with Settings › Dimming at 0% and at 40% | App CPU unchanged (the dimming layer costs the app nothing per frame). Compare **WindowServer** CPU and GPU power between 0% and 40%: the difference decides whether dimming stays a layer or has to be baked into the rendition |
 | 10 | Half speed | Scenario 2 with the wallpaper's speed at 0.5× | Half the frame-distribution callbacks per second and roughly half the media-engine activity of scenario 2 |
 | 11 | Panorama | Two or more displays, "Stretch one video across the displays" on | Exactly one `Decoding` interval; the picture is continuous across the displays; same app CPU as scenario 2 |
 | 12 | Playlist, desktop visible | An interval playlist of one minute, desktop visible | One wake-up per change (`reconcile … reason=playlist_advance`), nothing in between; at each change the previous `Decoding` interval closes before the next opens |

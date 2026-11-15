@@ -1,188 +1,133 @@
-import AppKit
 import SwiftUI
 
+/// The library: a grid of wallpapers. Selecting one opens an inspector with
+/// everything that can be done with it; double-clicking puts it on every
+/// display.
 struct LibraryView: View {
     @Environment(AppCoordinator.self) private var coordinator
+    @State private var selection: UUID?
+    @State private var searchText = ""
     @State private var editedAsset: WallpaperAsset?
+    @State private var pendingRemoval: WallpaperAsset?
+
+    private var visibleAssets: [WallpaperAsset] {
+        let query = searchText.trimmingCharacters(in: .whitespaces)
+        guard !query.isEmpty else { return coordinator.assets }
+        return coordinator.assets.filter { $0.displayName.localizedCaseInsensitiveContains(query) }
+    }
+
+    private var selectedAsset: WallpaperAsset? {
+        coordinator.assets.first { $0.id == selection }
+    }
 
     var body: some View {
-        page
+        content
+            .navigationTitle("Library")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        coordinator.importVideos()
+                    } label: {
+                        Label("Import videos…", systemImage: "plus")
+                    }
+                    .help(Text("Opens a panel to choose one or more video files."))
+                }
+            }
+            .searchable(text: $searchText, placement: .toolbar)
+            .inspector(
+                isPresented: Binding(
+                    get: { selectedAsset != nil },
+                    set: { if !$0 { selection = nil } }
+                )
+            ) {
+                if let asset = selectedAsset {
+                    AssetInspectorPane(
+                        asset: asset,
+                        onEdit: { editedAsset = asset },
+                        onRemove: { pendingRemoval = asset }
+                    )
+                    .inspectorColumnWidth(min: 260, ideal: 290, max: 360)
+                }
+            }
             .sheet(item: $editedAsset) { asset in
                 AssetEditorView(asset: asset)
                     .environment(coordinator)
             }
+            .confirmationDialog(
+                Text("Remove “\(pendingRemoval?.displayName ?? "")” from the library?"),
+                isPresented: Binding(get: { pendingRemoval != nil }, set: { if !$0 { pendingRemoval = nil } }),
+                presenting: pendingRemoval
+            ) { asset in
+                Button("Remove", role: .destructive) {
+                    coordinator.removeAsset(asset)
+                }
+            } message: { _ in
+                Text("The original video file is not deleted.")
+            }
     }
 
-    private var page: some View {
-        WallpaperPageScrollView {
-            WallpaperPageHeader(
-                String(localized: "Library"),
-                subtitle: String(localized: "Import videos, or drag them into this window, and choose the wallpaper for all displays.")
-            ) {
-                Button("Import videos…") {
-                    coordinator.importVideos()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .accessibilityHint(Text("Opens a panel to choose one or more video files."))
+    @ViewBuilder
+    private var content: some View {
+        if coordinator.assets.isEmpty {
+            ContentUnavailableView {
+                Label("No videos yet", systemImage: "photo.on.rectangle")
+            } description: {
+                Text("Import a video or drop one here to start your wallpaper library.")
+            } actions: {
+                Button("Import videos…") { coordinator.importVideos() }
+                    .buttonStyle(.borderedProminent)
             }
+        } else if visibleAssets.isEmpty {
+            ContentUnavailableView.search(text: searchText)
+        } else {
+            grid
+        }
+    }
 
-            if coordinator.assets.isEmpty {
-                WallpaperGlassCard {
-                    ContentUnavailableView(
-                        "No videos yet",
-                        systemImage: "film.stack",
-                        description: Text("Import a video or drop one here to start your wallpaper library.")
+    private var grid: some View {
+        let activeIDs = Set(coordinator.resolution.displays.map(\.assetID))
+
+        return ScrollView {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 180, maximum: 300), spacing: 16)], spacing: 18) {
+                ForEach(visibleAssets) { asset in
+                    AssetTile(
+                        asset: asset,
+                        activity: coordinator.importActivity(for: asset),
+                        isSelected: selection == asset.id,
+                        isInUse: activeIDs.contains(asset.id)
                     )
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 30)
-                }
-            } else {
-                LazyVStack(spacing: 14) {
-                    ForEach(coordinator.assets) { asset in
-                        assetCard(for: asset)
+                    .onTapGesture { selection = asset.id }
+                    .simultaneousGesture(
+                        TapGesture(count: 2).onEnded { coordinator.setGlobalAsset(asset.id) }
+                    )
+                    .contextMenu { tileMenu(for: asset) }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAddTraits(selection == asset.id ? .isSelected : [])
+                    .accessibilityAction(named: Text("Use on all displays")) {
+                        coordinator.setGlobalAsset(asset.id)
                     }
                 }
             }
+            .padding(20)
+        }
+        .background {
+            // Clicking the empty area closes the inspector.
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture { selection = nil }
         }
     }
 
-    private func statusColor(for asset: WallpaperAsset, activity: ImportActivity?) -> Color {
-        if activity != nil || (asset.optimizationState == .pending && asset.optimizedPlayback == nil) {
-            return .blue
+    @ViewBuilder
+    private func tileMenu(for asset: WallpaperAsset) -> some View {
+        Button("Use on all displays") {
+            coordinator.setGlobalAsset(asset.id)
         }
-
-        switch AssetInspector.effectiveProfile(for: asset).tier {
-        case .safe:
-            return .green
-        case .warning:
-            return .orange
-        case .unsupported:
-            return .red
-        }
-    }
-
-    private func assetCard(for asset: WallpaperAsset) -> some View {
-        let activity = coordinator.importActivity(for: asset)
-        let profile = AssetInspector.effectiveProfile(for: asset)
-
-        return WallpaperGlassCard(padding: 18, cornerRadius: 26) {
-            HStack(alignment: .top, spacing: 18) {
-                AssetPosterThumbnailView(url: coordinator.thumbnailURL(for: asset))
-                    .accessibilityHidden(true)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack(alignment: .top, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(asset.displayName)
-                                .font(.title3.weight(.semibold))
-                            Text(AssetInspector.technicalSummary(for: asset))
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            if let rendition = AssetInspector.renditionSummary(for: asset) {
-                                Text(rendition)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        Spacer(minLength: 12)
-
-                        WallpaperStatusPill(
-                            label: AssetInspector.statusText(for: asset, activity: activity),
-                            color: statusColor(for: asset, activity: activity)
-                        )
-                    }
-
-                    if let activity {
-                        HStack(spacing: 12) {
-                            if activity.isQueued {
-                                ProgressView()
-                                    .progressViewStyle(.linear)
-                            } else {
-                                ProgressView(value: activity.progress)
-                                    .progressViewStyle(.linear)
-                                    .accessibilityLabel(Text("Optimization progress"))
-                            }
-
-                            Button("Cancel") {
-                                coordinator.cancelImport(of: asset)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .accessibilityLabel(Text("Cancel optimization of \(asset.displayName)"))
-                        }
-                    }
-
-                    if let strategies = asset.optimizedPlayback?.watermarkStrategies, !strategies.isEmpty, activity == nil {
-                        let labels = Set(strategies.compactMap(WatermarkStrategy.init(rawValue:)))
-                            .sorted { $0.rawValue < $1.rawValue }
-                            .map(\.localizedLabel)
-                        Text("Logo removal: \(labels.joined(separator: ", "))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    if !profile.reasonCodes.isEmpty {
-                        Text("Notes: \(profile.reasonCodes.map(AssetInspector.reasonLabel(for:)).joined(separator: ", "))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    HStack(spacing: 10) {
-                        if coordinator.globalAssetID() == asset.id {
-                            WallpaperStatusPill(label: String(localized: "On all displays"), color: .blue)
-                        }
-
-                        if asset.sourceIsHDR || asset.optimizedPlayback?.isHDR == true {
-                            WallpaperStatusPill(label: "HDR", color: .purple)
-                        }
-
-                        if asset.hasAudio {
-                            WallpaperStatusPill(label: String(localized: "Plays without sound"), color: .gray)
-                        }
-
-                        if !asset.editRecipe.isEmpty {
-                            WallpaperStatusPill(
-                                label: activity == nil && OptimizationPlanner.isStale(asset: asset)
-                                    ? String(localized: "Edits not applied")
-                                    : String(localized: "Edited"),
-                                color: activity == nil && OptimizationPlanner.isStale(asset: asset) ? .orange : .blue
-                            )
-                        }
-
-                        if asset.originalUnavailable {
-                            WallpaperStatusPill(label: String(localized: "Original file unavailable"), color: .orange)
-                                .help(Text("A sharper copy could not be made because the original file cannot be reached. The current copy is kept."))
-                        }
-                    }
-
-                    assetAdjustments(for: asset)
-
-                    HStack(spacing: 10) {
-                        Button("Use on all displays") {
-                            coordinator.setGlobalAsset(asset.id)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(profile.tier == .unsupported && activity == nil)
-
-                        Button("Edit…") {
-                            editedAsset = asset
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(asset.optimizationState != .ready)
-                        .accessibilityLabel(Text("Edit \(asset.displayName)"))
-
-                        Button("Remove", role: .destructive) {
-                            coordinator.removeAsset(asset)
-                        }
-                        .buttonStyle(.bordered)
-                        .accessibilityLabel(Text("Remove \(asset.displayName)"))
-                    }
-                }
-            }
-        }
-        .accessibilityElement(children: .contain)
+        UseOnDisplayMenu(asset: asset)
+        Divider()
+        Button("Edit…") { editedAsset = asset }
+            .disabled(asset.optimizationState != .ready)
+        Button("Remove", role: .destructive) { pendingRemoval = asset }
     }
 }
 
@@ -191,30 +136,297 @@ extension LibraryView {
     static let dimmingSteps: [Double] = [0, 0.2, 0.4, 0.6, 0.8]
 
     static func rateLabel(_ rate: Double) -> String {
-        rate == 1
-            ? String(localized: "Normal speed")
-            : "\(rate.formatted(.number.precision(.fractionLength(0...2))))×"
+        "\(rate.formatted(.number.precision(.fractionLength(0...2))))×"
     }
+}
 
-    /// Per-wallpaper settings that take effect without a new rendition.
-    @ViewBuilder
-    fileprivate func assetAdjustments(for asset: WallpaperAsset) -> some View {
-        HStack(spacing: 14) {
-            Picker(
-                "Speed",
-                selection: Binding(
-                    get: { asset.effectivePlaybackRate },
-                    set: { coordinator.updatePlaybackRate($0, for: asset.id) }
-                )
-            ) {
-                ForEach(Self.playbackRates, id: \.self) { rate in
-                    Text(Self.rateLabel(rate)).tag(rate)
+/// "Use on ▸ <display>", offered only when there is more than one display.
+private struct UseOnDisplayMenu: View {
+    @Environment(AppCoordinator.self) private var coordinator
+    let asset: WallpaperAsset
+
+    var body: some View {
+        let displays = coordinator.runtimeState.activeDisplays
+        if displays.count > 1 {
+            Menu("Use on one display") {
+                ForEach(displays) { display in
+                    Button(display.localizedName) {
+                        coordinator.assignAsset(asset.id, to: display)
+                    }
                 }
             }
-            .pickerStyle(.menu)
-            .fixedSize()
-            .help(Text("Slower playback is calmer and uses less energy: fewer frames are decoded each second."))
-            .accessibilityLabel(Text("Speed of \(asset.displayName)"))
+        }
+    }
+}
+
+// MARK: - Tile
+
+private struct AssetTile: View {
+    let asset: WallpaperAsset
+    let activity: ImportActivity?
+    let isSelected: Bool
+    let isInUse: Bool
+
+    private var tier: PlaybackProfile.Tier {
+        AssetInspector.effectiveProfile(for: asset).tier
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            AssetThumbnail(asset: asset, cornerRadius: 8)
+                .overlay(alignment: .topLeading) {
+                    if isInUse {
+                        badge(systemImage: "display", text: Text("On screen"), color: .green)
+                    }
+                }
+                .overlay(alignment: .topTrailing) {
+                    if activity == nil, tier != .safe {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, tier == .unsupported ? Color.red : Color.orange)
+                            .padding(6)
+                            .help(Text(AssetInspector.statusText(for: asset)))
+                    }
+                }
+                .overlay(alignment: .bottom) {
+                    if let activity {
+                        progress(for: activity)
+                    }
+                }
+                .padding(3)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .strokeBorder(Color.accentColor, lineWidth: isSelected ? 3 : 0)
+                }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(asset.displayName)
+                    .font(.callout.weight(.medium))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(activity == nil ? AssetInspector.shortSummary(for: asset) : AssetInspector.statusText(for: asset, activity: activity))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 4)
+        }
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(asset.displayName))
+        .accessibilityValue(Text(isInUse ? String(localized: "On screen") : AssetInspector.statusText(for: asset, activity: activity)))
+    }
+
+    private func badge(systemImage: String, text: Text, color: Color) -> some View {
+        Label { text } icon: { Image(systemName: systemImage) }
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(color, in: Capsule())
+            .padding(6)
+    }
+
+    private func progress(for activity: ImportActivity) -> some View {
+        Group {
+            if activity.isQueued {
+                ProgressView()
+                    .progressViewStyle(.linear)
+            } else {
+                ProgressView(value: activity.progress)
+                    .progressViewStyle(.linear)
+            }
+        }
+        .tint(.white)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(.black.opacity(0.45))
+        .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 8, bottomTrailingRadius: 8, style: .continuous))
+        .accessibilityLabel(Text("Optimization progress"))
+    }
+}
+
+// MARK: - Inspector
+
+/// Everything about one wallpaper: where it is used, how it plays, and the
+/// technical details for those who want them.
+private struct AssetInspectorPane: View {
+    @Environment(AppCoordinator.self) private var coordinator
+    let asset: WallpaperAsset
+    let onEdit: () -> Void
+    let onRemove: () -> Void
+
+    var body: some View {
+        let activity = coordinator.importActivity(for: asset)
+        let profile = AssetInspector.effectiveProfile(for: asset)
+        let shownOn = coordinator.displayNames(showing: asset.id)
+
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                AssetThumbnail(asset: asset, cornerRadius: 10)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(asset.displayName)
+                        .font(.title3.weight(.semibold))
+                        .textSelection(.enabled)
+                    statusLine(activity: activity, profile: profile)
+                }
+
+                if let activity {
+                    activityRow(activity)
+                }
+
+                ForEach(notices(activity: activity, profile: profile), id: \.text) { notice in
+                    Label {
+                        Text(notice.text)
+                            .font(.caption)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } icon: {
+                        Image(systemName: notice.systemImage)
+                            .foregroundStyle(notice.color)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Button {
+                        coordinator.setGlobalAsset(asset.id)
+                    } label: {
+                        Text("Use on all displays")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .disabled(profile.tier == .unsupported && activity == nil)
+
+                    UseOnDisplayMenu(asset: asset)
+
+                    if !shownOn.isEmpty {
+                        Label {
+                            Text("Showing on \(shownOn.formatted(.list(type: .and)))")
+                        } icon: {
+                            Image(systemName: "display")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+
+                Divider()
+                playbackControls
+
+                Divider()
+                editControls(activity: activity)
+
+                Divider()
+                DisclosureGroup("Details") {
+                    details
+                        .padding(.top, 6)
+                }
+                .font(.callout)
+
+                Button("Remove from library…", role: .destructive, action: onRemove)
+                    .accessibilityLabel(Text("Remove \(asset.displayName)"))
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func statusLine(activity: ImportActivity?, profile: PlaybackProfile) -> some View {
+        let color: Color
+        if activity != nil || (asset.optimizationState == .pending && asset.optimizedPlayback == nil) {
+            color = .blue
+        } else {
+            switch profile.tier {
+            case .safe: color = .green
+            case .warning: color = .orange
+            case .unsupported: color = .red
+            }
+        }
+        return HStack(spacing: 6) {
+            StatusDot(color: color)
+            Text(AssetInspector.statusText(for: asset, activity: activity))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func activityRow(_ activity: ImportActivity) -> some View {
+        HStack(spacing: 10) {
+            if activity.isQueued {
+                ProgressView().progressViewStyle(.linear)
+            } else {
+                ProgressView(value: activity.progress)
+                    .progressViewStyle(.linear)
+                    .accessibilityLabel(Text("Optimization progress"))
+            }
+            Button("Cancel") { coordinator.cancelImport(of: asset) }
+                .controlSize(.small)
+                .accessibilityLabel(Text("Cancel optimization of \(asset.displayName)"))
+        }
+    }
+
+    private struct Notice {
+        var systemImage: String
+        var color: Color
+        var text: String
+    }
+
+    /// Things the user should know about, in plain words. Empty when all is well.
+    private func notices(activity: ImportActivity?, profile: PlaybackProfile) -> [Notice] {
+        var notices: [Notice] = []
+        if activity == nil, profile.tier != .safe, !profile.reasonCodes.isEmpty {
+            let reasons = profile.reasonCodes.map(AssetInspector.reasonLabel(for:)).joined(separator: ", ")
+            notices.append(
+                Notice(
+                    systemImage: "exclamationmark.triangle.fill",
+                    color: profile.tier == .unsupported ? .red : .orange,
+                    text: String(localized: "Notes: \(reasons)")
+                )
+            )
+        }
+        if asset.originalUnavailable {
+            notices.append(
+                Notice(
+                    systemImage: "questionmark.folder",
+                    color: .orange,
+                    text: String(localized: "A sharper copy could not be made because the original file cannot be reached. The current copy is kept.")
+                )
+            )
+        }
+        if activity == nil, !asset.editRecipe.isEmpty, OptimizationPlanner.isStale(asset: asset) {
+            notices.append(
+                Notice(systemImage: "clock.arrow.circlepath", color: .orange, text: String(localized: "Edits not applied"))
+            )
+        }
+        return notices
+    }
+
+    private var playbackControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Speed")
+                    .font(.callout.weight(.medium))
+                Picker(
+                    "Speed",
+                    selection: Binding(
+                        get: { asset.effectivePlaybackRate },
+                        set: { coordinator.updatePlaybackRate($0, for: asset.id) }
+                    )
+                ) {
+                    ForEach(LibraryView.playbackRates, id: \.self) { rate in
+                        Text(verbatim: LibraryView.rateLabel(rate)).tag(rate)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .accessibilityLabel(Text("Speed of \(asset.displayName)"))
+                Text("Slower playback is calmer and uses less energy: fewer frames are decoded each second.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             Picker(
                 "Dimming",
@@ -224,72 +436,62 @@ extension LibraryView {
                 )
             ) {
                 Text("Same as in Settings").tag(Optional<Double>.none)
-                ForEach(Self.dimmingSteps, id: \.self) { amount in
+                Divider()
+                ForEach(LibraryView.dimmingSteps, id: \.self) { amount in
                     Text(amount.formatted(.percent.precision(.fractionLength(0)))).tag(Optional(amount))
                 }
             }
-            .pickerStyle(.menu)
-            .fixedSize()
+            .font(.callout.weight(.medium))
             .accessibilityLabel(Text("Dimming of \(asset.displayName)"))
         }
     }
-}
 
-/// Loads the small thumbnail asynchronously; nothing is decoded in `body`.
-private struct AssetPosterThumbnailView: View {
-    let url: URL?
-    @State private var image: NSImage?
-    @Environment(\.colorScheme) private var colorScheme
+    private func editControls(activity: ImportActivity?) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button(action: onEdit) {
+                Label("Edit loop or remove a logo…", systemImage: "scissors")
+            }
+            .disabled(asset.optimizationState != .ready)
+            .accessibilityLabel(Text("Edit \(asset.displayName)"))
 
-    var body: some View {
-        Group {
-            if let image {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                LinearGradient(
-                    colors: placeholderGradient,
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .overlay(
-                    Image(systemName: "film")
-                        .font(.system(size: 26, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.9))
-                )
-            }
-        }
-        .frame(width: 220, height: 124)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.white.opacity(colorScheme == .dark ? 0.12 : 0.35), lineWidth: 1)
-                .allowsHitTesting(false)
-        }
-        .task(id: url) {
-            guard let url else {
-                image = nil
-                return
-            }
-            image = ThumbnailCache.shared.cachedImage(for: url)
-            if image == nil {
-                image = await ThumbnailCache.shared.image(for: url)
+            if let summary = AssetInspector.editSummary(for: asset) {
+                Text("Edited: \(summary)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
-    private var placeholderGradient: [Color] {
-        if colorScheme == .dark {
-            return [
-                Color(red: 0.18, green: 0.24, blue: 0.33),
-                Color(red: 0.22, green: 0.19, blue: 0.17)
-            ]
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            detail(Text("Original"), AssetInspector.technicalSummary(for: asset))
+            if let rendition = AssetInspector.renditionSummary(for: asset) {
+                detail(Text("Playback"), rendition)
+            }
+            if let strategies = asset.optimizedPlayback?.watermarkStrategies, !strategies.isEmpty {
+                let labels = Set(strategies.compactMap(WatermarkStrategy.init(rawValue:)))
+                    .sorted { $0.rawValue < $1.rawValue }
+                    .map(\.localizedLabel)
+                detail(Text("Logo removal"), labels.joined(separator: ", "))
+            }
+            if asset.hasAudio {
+                detail(Text("Sound"), String(localized: "Plays without sound"))
+            }
+            detail(Text("Imported"), asset.importedAt.formatted(date: .abbreviated, time: .shortened))
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
-        return [
-            Color(red: 0.87, green: 0.90, blue: 0.95),
-            Color(red: 0.96, green: 0.89, blue: 0.78)
-        ]
+    private func detail(_ title: Text, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            title
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
     }
 }

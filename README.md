@@ -36,8 +36,10 @@ WallSync is a macOS app project for managing animated wallpapers across displays
     panorama geometry, loop-point and logo-removal maths)
   - `Infrastructure/`: AVFoundation, AppKit, Metal frame processing used
     by the optimizer, storage and system integration
-  - `Features/`: SwiftUI screens (library, editor, displays, playlists,
-    settings, diagnostics) and the App Intents
+  - `Features/`: SwiftUI screens and the App Intents. `Shell` is the main
+    window (sidebar, shared components); `Library` is the grid with its
+    inspector; `Displays`, `Playlists`, `Editor` and `Settings` (which ends
+    with the diagnostics) are one page each
   - `App/`: coordinator, session manager, menu bar item
 - `Tests/Unit/`: unit tests, session-manager tests with test doubles, and
   integration tests that synthesize short clips at run time
@@ -71,7 +73,8 @@ pull request.
 
 ## Diagnostics and performance
 
-Settings › Diagnostics shows what every display is doing and why. Logs use the
+The Displays page shows what every display is doing and why, in plain words;
+Settings › Diagnostics has the technical detail. Logs use the
 subsystem `com.yurisantos.wallpaper`. See `Distribution/PERFORMANCE.md` for how
 to verify energy use, sync and "no decoding when unseen" with Instruments.
 

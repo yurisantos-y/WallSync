@@ -881,6 +881,17 @@ final class AppCoordinator {
         persistPlacementsAndReconcile(reason: "content_mode_changed")
     }
 
+    /// Scaling of the wallpaper for all displays.
+    var globalContentMode: WallpaperPlacement.ContentMode {
+        globalPlacement?.contentMode ?? .aspectFill
+    }
+
+    func updateGlobalContentMode(_ contentMode: WallpaperPlacement.ContentMode) {
+        guard let index = placements.firstIndex(where: \.isGlobal), placements[index].contentMode != contentMode else { return }
+        updatePlacements { $0[index].contentMode = contentMode }
+        persistPlacementsAndReconcile(reason: "content_mode_changed")
+    }
+
     func updateStartOnLaunch(_ enabled: Bool) {
         updatePreferences {
             $0.startOnLaunch = enabled
@@ -1133,6 +1144,28 @@ final class AppCoordinator {
     var activePlaylists: [WallpaperPlaylist] {
         let ids = resolution.activePlaylistIDs
         return playlists.filter { ids.contains($0.id) }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// Whether "Next wallpaper" would change anything for this playlist.
+    func canAdvanceNow(_ playlist: WallpaperPlaylist) -> Bool {
+        resolution.activePlaylistIDs.contains(playlist.id) && canAdvance(playlist)
+    }
+
+    /// Whether any display, or all of them, is set to this playlist.
+    func isPlaylistAssigned(_ playlistID: UUID) -> Bool {
+        placements.contains { $0.playlistID == playlistID }
+    }
+
+    /// Takes a playlist out of rotation everywhere; each place goes back to
+    /// its fixed wallpaper.
+    func deactivatePlaylist(_ playlistID: UUID) {
+        guard isPlaylistAssigned(playlistID) else { return }
+        updatePlacements { placements in
+            for index in placements.indices where placements[index].playlistID == playlistID {
+                placements[index].playlistID = nil
+            }
+        }
+        persistPlacementsAndReconcile(reason: "playlist_deactivated")
     }
 
     private func canAdvance(_ playlist: WallpaperPlaylist) -> Bool {

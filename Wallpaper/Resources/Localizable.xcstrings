@@ -17,86 +17,6 @@
         }
       }
     },
-    "%lld displays": {
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld display"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld displays"
-                }
-              }
-            }
-          }
-        },
-        "pt-BR": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld monitor"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld monitores"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "%lld in fullscreen": {
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld in fullscreen"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld in fullscreen"
-                }
-              }
-            }
-          }
-        },
-        "pt-BR": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld em tela cheia"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld em tela cheia"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "%lld wallpapers": {
       "localizations": {
         "en": {
@@ -109,46 +29,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld wallpapers"
-          }
-        }
-      }
-    },
-    "%lld wallpapers running": {
-      "localizations": {
-        "en": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld wallpaper running"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld wallpapers running"
-                }
-              }
-            }
-          }
-        },
-        "pt-BR": {
-          "variations": {
-            "plural": {
-              "one": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld wallpaper em execução"
-                }
-              },
-              "other": {
-                "stringUnit": {
-                  "state": "translated",
-                  "value": "%lld wallpapers em execução"
-                }
-              }
-            }
           }
         }
       }
@@ -201,18 +81,18 @@
         }
       }
     },
-    "A playlist changes the wallpaper by itself. The wallpaper chosen above is used while the playlist has nothing to show.": {
+    "A playlist changes the wallpaper by itself.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A playlist changes the wallpaper by itself. The wallpaper chosen above is used while the playlist has nothing to show."
+            "value": "A playlist changes the wallpaper by itself."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Uma playlist troca o wallpaper sozinha. O wallpaper escolhido acima é usado enquanto a playlist não tem nada para mostrar."
+            "value": "Uma playlist troca o wallpaper sozinha."
           }
         }
       }
@@ -229,22 +109,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Não foi possível gerar uma cópia mais nítida porque o arquivo original está inacessível. A cópia atual foi mantida."
-          }
-        }
-      }
-    },
-    "A wallpaper for each display.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A wallpaper for each display."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Um wallpaper para cada monitor."
           }
         }
       }
@@ -313,22 +177,6 @@
         }
       }
     },
-    "Advance": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Advance"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Avanço"
-          }
-        }
-      }
-    },
     "After": {
       "localizations": {
         "en": {
@@ -393,18 +241,18 @@
         }
       }
     },
-    "Animated wallpapers, in sync on every display.": {
+    "Animate only the main display": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Animated wallpapers, in sync on every display."
+            "value": "Animate only the main display"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Wallpapers animados, em sincronia em todos os monitores."
+            "value": "Animar só o monitor principal"
           }
         }
       }
@@ -497,54 +345,6 @@
         }
       }
     },
-    "App behavior": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "App behavior"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Comportamento do app"
-          }
-        }
-      }
-    },
-    "App behavior and playback quality.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "App behavior and playback quality."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Comportamento do app e qualidade de reprodução."
-          }
-        }
-      }
-    },
-    "Applies to videos you import from now on. Videos in use are re-optimized in the background when a higher quality becomes possible.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Applies to videos you import from now on. Videos in use are re-optimized in the background when a higher quality becomes possible."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Vale para os vídeos importados a partir de agora. Os vídeos em uso são reotimizados em segundo plano quando uma qualidade maior se torna possível."
-          }
-        }
-      }
-    },
     "Apply": {
       "localizations": {
         "en": {
@@ -577,38 +377,6 @@
         }
       }
     },
-    "Automatic policies": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Automatic policies"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Políticas automáticas"
-          }
-        }
-      }
-    },
-    "Balanced": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Balanced"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Equilibrado"
-          }
-        }
-      }
-    },
     "Battery": {
       "localizations": {
         "en": {
@@ -625,38 +393,6 @@
         }
       }
     },
-    "Battery saver": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Battery saver"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Economia de bateria"
-          }
-        }
-      }
-    },
-    "Battery saver also keeps secondary displays on a still frame while on battery.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Battery saver also keeps secondary displays on a still frame while on battery."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A economia de bateria também mantém os monitores secundários em um quadro estático enquanto o Mac estiver na bateria."
-          }
-        }
-      }
-    },
     "Battery saver on secondary display": {
       "localizations": {
         "en": {
@@ -669,22 +405,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Economia de bateria no monitor secundário"
-          }
-        }
-      }
-    },
-    "Battery, covered desktop and fullscreen.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Battery, covered desktop and fullscreen."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Bateria, área de trabalho coberta e tela cheia."
           }
         }
       }
@@ -785,6 +505,22 @@
         }
       }
     },
+    "Changes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Troca"
+          }
+        }
+      }
+    },
     "Check the suggested areas, and adjust or remove them if needed.": {
       "localizations": {
         "en": {
@@ -813,38 +549,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Escolha um ou mais vídeos para usar como wallpaper."
-          }
-        }
-      }
-    },
-    "Choose one wallpaper for every display, or a different one for each, and see what each display is doing.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choose one wallpaper for every display, or a different one for each, and see what each display is doing."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Escolha um wallpaper para todos os monitores, ou um diferente para cada um, e veja o que cada monitor está fazendo."
-          }
-        }
-      }
-    },
-    "Choose whether wallpapers start by themselves.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Choose whether wallpapers start by themselves."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Escolha se os wallpapers iniciam sozinhos."
           }
         }
       }
@@ -977,22 +681,6 @@
         }
       }
     },
-    "Create a playlist, add wallpapers from your library and choose how it advances.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Create a playlist, add wallpapers from your library and choose how it advances."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Crie uma playlist, adicione wallpapers da biblioteca e escolha como ela avança."
-          }
-        }
-      }
-    },
     "Critical": {
       "localizations": {
         "en": {
@@ -1021,38 +709,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Crossfade"
-          }
-        }
-      }
-    },
-    "Current status": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Current status"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Estado atual"
-          }
-        }
-      }
-    },
-    "Current wallpaper": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Current wallpaper"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wallpaper atual"
           }
         }
       }
@@ -1137,6 +793,22 @@
         }
       }
     },
+    "Demanding videos, such as 60 fps ones, show a still frame.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demanding videos, such as 60 fps ones, show a still frame."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vídeos exigentes, como os de 60 fps, mostram um quadro estático."
+          }
+        }
+      }
+    },
     "Desktop covered": {
       "localizations": {
         "en": {
@@ -1149,6 +821,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Área de trabalho coberta"
+          }
+        }
+      }
+    },
+    "Details": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Details"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detalhes"
           }
         }
       }
@@ -1313,6 +1001,22 @@
         }
       }
     },
+    "Each wallpaper is shown from its time until the next one begins.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Each wallpaper is shown from its time until the next one begins."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cada wallpaper aparece a partir do seu horário até o próximo começar."
+          }
+        }
+      }
+    },
     "Edit %@": {
       "localizations": {
         "en": {
@@ -1345,6 +1049,22 @@
         }
       }
     },
+    "Edit loop or remove a logo…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit loop or remove a logo…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar loop ou remover logo…"
+          }
+        }
+      }
+    },
     "Edit video": {
       "localizations": {
         "en": {
@@ -1361,18 +1081,18 @@
         }
       }
     },
-    "Edited": {
+    "Edited: %@": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Edited"
+            "value": "Edited: %@"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Editado"
+            "value": "Editado: %@"
           }
         }
       }
@@ -1521,22 +1241,6 @@
         }
       }
     },
-    "Energy profile": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Energy profile"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Perfil de energia"
-          }
-        }
-      }
-    },
     "Error": {
       "localizations": {
         "en": {
@@ -1665,6 +1369,22 @@
         }
       }
     },
+    "Follows the light and dark appearance of macOS.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follows the light and dark appearance of macOS."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acompanha a aparência clara e escura do macOS."
+          }
+        }
+      }
+    },
     "From the playlist “%@”": {
       "localizations": {
         "en": {
@@ -1697,18 +1417,18 @@
         }
       }
     },
-    "General": {
+    "Goes back to the fixed wallpaper.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "General"
+            "value": "Goes back to the fixed wallpaper."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Geral"
+            "value": "Volta para o wallpaper fixo."
           }
         }
       }
@@ -1777,38 +1497,6 @@
         }
       }
     },
-    "How WallSync behaves when it opens and how videos are prepared.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "How WallSync behaves when it opens and how videos are prepared."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Como o WallSync se comporta ao abrir e como os vídeos são preparados."
-          }
-        }
-      }
-    },
-    "How the wallpaper reacts to battery power, covered desktops and fullscreen apps.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "How the wallpaper reacts to battery power, covered desktops and fullscreen apps."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Como o wallpaper reage à bateria, à área de trabalho coberta e a apps em tela cheia."
-          }
-        }
-      }
-    },
     "Idle": {
       "localizations": {
         "en": {
@@ -1857,22 +1545,6 @@
         }
       }
     },
-    "Import videos, or drag them into this window, and choose the wallpaper for all displays.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Import videos, or drag them into this window, and choose the wallpaper for all displays."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Importe vídeos, ou arraste-os para esta janela, e escolha o wallpaper de todos os monitores."
-          }
-        }
-      }
-    },
     "Import videos…": {
       "localizations": {
         "en": {
@@ -1885,6 +1557,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Importar vídeos…"
+          }
+        }
+      }
+    },
+    "Imported": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Imported"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Importado"
           }
         }
       }
@@ -2001,50 +1689,34 @@
         }
       }
     },
-    "Live state of every display, to verify what is animating and why.": {
+    "Logo removal": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Live state of every display, to verify what is animating and why."
+            "value": "Logo removal"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Estado em tempo real de cada monitor, para verificar o que está animando e por quê."
+            "value": "Remoção de logo"
           }
         }
       }
     },
-    "Live state of every display.": {
+    "Logo removed": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Live state of every display."
+            "value": "Logo removed"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Estado em tempo real de cada monitor."
-          }
-        }
-      }
-    },
-    "Logo removal: %@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Logo removal: %@"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Remoção de logotipo: %@"
+            "value": "Logo removido"
           }
         }
       }
@@ -2225,6 +1897,38 @@
         }
       }
     },
+    "Move down": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move down"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover para baixo"
+          }
+        }
+      }
+    },
+    "Move up": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move up"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mover para cima"
+          }
+        }
+      }
+    },
     "Moves the playlist in rotation on to its next wallpaper.": {
       "localizations": {
         "en": {
@@ -2385,22 +2089,6 @@
         }
       }
     },
-    "No playlist": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No playlist"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nenhuma playlist"
-          }
-        }
-      }
-    },
     "No playlist with more than one wallpaper is in rotation.": {
       "localizations": {
         "en": {
@@ -2413,22 +2101,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nenhuma playlist com mais de um wallpaper está em rotação."
-          }
-        }
-      }
-    },
-    "No playlists yet": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No playlists yet"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nenhuma playlist ainda"
           }
         }
       }
@@ -2461,22 +2133,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nenhum wallpaper escolhido"
-          }
-        }
-      }
-    },
-    "No wallpaper for all displays is set": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "No wallpaper for all displays is set"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Nenhum wallpaper definido para todos os monitores"
           }
         }
       }
@@ -2529,22 +2185,6 @@
         }
       }
     },
-    "Normal speed": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Normal speed"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Velocidade normal"
-          }
-        }
-      }
-    },
     "Not animating": {
       "localizations": {
         "en": {
@@ -2573,6 +2213,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sem animação: %@"
+          }
+        }
+      }
+    },
+    "Not in use": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not in use"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fora de uso"
           }
         }
       }
@@ -2657,22 +2313,6 @@
         }
       }
     },
-    "On all displays": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "On all displays"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Em todos os monitores"
-          }
-        }
-      }
-    },
     "On battery": {
       "localizations": {
         "en": {
@@ -2685,6 +2325,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Na bateria"
+          }
+        }
+      }
+    },
+    "On screen": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On screen"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Na tela"
           }
         }
       }
@@ -2705,22 +2361,6 @@
         }
       }
     },
-    "Open WallSync automatically when you log in to your Mac.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open WallSync automatically when you log in to your Mac."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abra o WallSync automaticamente ao iniciar a sessão no Mac."
-          }
-        }
-      }
-    },
     "Open WallSync…": {
       "localizations": {
         "en": {
@@ -2733,38 +2373,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Abrir o WallSync…"
-          }
-        }
-      }
-    },
-    "Open at login": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open at login"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abrir ao iniciar a sessão"
-          }
-        }
-      }
-    },
-    "Open at login.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Open at login."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Abrir ao iniciar a sessão."
           }
         }
       }
@@ -2833,6 +2441,22 @@
         }
       }
     },
+    "Original": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original"
+          }
+        }
+      }
+    },
     "Original file": {
       "localizations": {
         "en": {
@@ -2861,22 +2485,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Arquivo original indisponível"
-          }
-        }
-      }
-    },
-    "Own wallpaper": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Own wallpaper"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wallpaper próprio"
           }
         }
       }
@@ -3181,38 +2789,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Playlist"
-          }
-        }
-      }
-    },
-    "Playlist for %@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Playlist for %@"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Playlist de %@"
-          }
-        }
-      }
-    },
-    "Playlist for all displays": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Playlist for all displays"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Playlist de todos os monitores"
           }
         }
       }
@@ -3569,6 +3145,22 @@
         }
       }
     },
+    "Remove from library…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove from library…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover da biblioteca…"
+          }
+        }
+      }
+    },
     "Remove logo or mark": {
       "localizations": {
         "en": {
@@ -3613,6 +3205,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Remover este horário"
+          }
+        }
+      }
+    },
+    "Remove “%@” from the library?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove “%@” from the library?"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover “%@” da biblioteca?"
           }
         }
       }
@@ -3841,22 +3449,6 @@
         }
       }
     },
-    "Sets of wallpapers that change after a while, by time of day, or with the light and dark appearance.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sets of wallpapers that change after a while, by time of day, or with the light and dark appearance."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Conjuntos de wallpapers que mudam por intervalo, por horário ou com a aparência clara e escura."
-          }
-        }
-      }
-    },
     "Settings": {
       "localizations": {
         "en": {
@@ -3889,6 +3481,38 @@
         }
       }
     },
+    "Showing on %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Showing on %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Em exibição em %@"
+          }
+        }
+      }
+    },
+    "Shows": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exibe"
+          }
+        }
+      }
+    },
     "Shows a wallpaper from your WallSync library on one display or on all of them.": {
       "localizations": {
         "en": {
@@ -3901,6 +3525,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostra um wallpaper da sua biblioteca do WallSync em um monitor ou em todos."
+          }
+        }
+      }
+    },
+    "Shows the next wallpaper after the chosen time, only while the desktop is visible.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows the next wallpaper after the chosen time, only while the desktop is visible."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostra o próximo wallpaper depois do tempo escolhido, só enquanto a área de trabalho está visível."
           }
         }
       }
@@ -3965,6 +3605,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fluidez (até 60 fps)"
+          }
+        }
+      }
+    },
+    "Sound": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sound"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Som"
           }
         }
       }
@@ -4097,22 +3753,6 @@
         }
       }
     },
-    "Status": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Status"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Estado"
-          }
-        }
-      }
-    },
     "Still frame": {
       "localizations": {
         "en": {
@@ -4189,38 +3829,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Suspenso"
-          }
-        }
-      }
-    },
-    "System": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "System"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sistema"
-          }
-        }
-      }
-    },
-    "Temperature: %@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Temperature: %@"
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Temperatura: %@"
           }
         }
       }
@@ -4449,6 +4057,38 @@
         }
       }
     },
+    "The original video file is not deleted.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The original video file is not deleted."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O arquivo de vídeo original não é apagado."
+          }
+        }
+      }
+    },
+    "The other displays show a still frame.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The other displays show a still frame."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os outros monitores mostram um quadro estático."
+          }
+        }
+      }
+    },
     "The saved permission for this video was not found.": {
       "localizations": {
         "en": {
@@ -4593,6 +4233,22 @@
         }
       }
     },
+    "The wallpapers stay in your library.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The wallpapers stay in your library."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os wallpapers continuam na sua biblioteca."
+          }
+        }
+      }
+    },
     "Thermal pressure": {
       "localizations": {
         "en": {
@@ -4637,6 +4293,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Este Mac não consegue processar as edições: nenhum dispositivo gráfico está disponível."
+          }
+        }
+      }
+    },
+    "Times": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Times"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Horários"
           }
         }
       }
@@ -4689,6 +4361,22 @@
         }
       }
     },
+    "Trimmed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trimmed"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cortado"
+          }
+        }
+      }
+    },
     "Undo reframing": {
       "localizations": {
         "en": {
@@ -4717,6 +4405,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Desconhecido"
+          }
+        }
+      }
+    },
+    "Untitled playlist": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untitled playlist"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist sem nome"
           }
         }
       }
@@ -4769,18 +4473,18 @@
         }
       }
     },
-    "Use the wallpaper for all displays": {
+    "Use on one display": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Use the wallpaper for all displays"
+            "value": "Use on one display"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Usar o wallpaper de todos os monitores"
+            "value": "Usar em um monitor"
           }
         }
       }
@@ -5121,54 +4825,6 @@
         }
       }
     },
-    "Wallpapers that change by themselves.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wallpapers that change by themselves."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wallpapers que mudam sozinhos."
-          }
-        }
-      }
-    },
-    "What macOS last reported for the login item.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "What macOS last reported for the login item."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "O que o macOS informou por último sobre o item de início de sessão."
-          }
-        }
-      }
-    },
-    "When on, WallSync starts together with your user session.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "When on, WallSync starts together with your user session."
-          }
-        },
-        "pt-BR": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quando ativado, o WallSync inicia junto com a sua sessão de usuário."
-          }
-        }
-      }
-    },
     "While this Focus is on": {
       "localizations": {
         "en": {
@@ -5201,18 +4857,18 @@
         }
       }
     },
-    "Your videos and the wallpaper for all displays.": {
+    "Your wallpaper": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Your videos and the wallpaper for all displays."
+            "value": "Your wallpaper"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Seus vídeos e o wallpaper de todos os monitores."
+            "value": "Seu wallpaper"
           }
         }
       }
