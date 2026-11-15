@@ -53,6 +53,23 @@ struct WallpaperPlacementEditor: View {
                 .disabled(coordinator.assets.isEmpty)
                 .accessibilityLabel(Text("Wallpaper for \(display.localizedName)"))
 
+                if !coordinator.playlists.isEmpty {
+                    Picker(
+                        "Playlist",
+                        selection: Binding<UUID?>(
+                            get: { coordinator.ownPlaylistID(for: display) },
+                            set: { coordinator.activatePlaylist($0, on: display) }
+                        )
+                    ) {
+                        Text("No playlist").tag(Optional<UUID>.none)
+                        ForEach(coordinator.playlists) { playlist in
+                            Text(playlist.name).tag(Optional(playlist.id))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .accessibilityLabel(Text("Playlist for \(display.localizedName)"))
+                }
+
                 Picker(
                     "Scaling",
                     selection: Binding(
@@ -95,6 +112,17 @@ struct WallpaperPlacementEditor: View {
     }
 
     private var sourceLabel: String {
+        switch coordinator.resolution.content(forDisplayUUID: display.displayUUID)?.source {
+        case let .playlist(id)?:
+            if let name = coordinator.playlist(withID: id)?.name {
+                return String(localized: "From the playlist “\(name)”")
+            }
+        case .focus?:
+            return String(localized: "Chosen by a Focus filter")
+        default:
+            break
+        }
+
         if coordinator.hasDisplayOverride(for: display) {
             return String(localized: "Chosen for this display")
         }

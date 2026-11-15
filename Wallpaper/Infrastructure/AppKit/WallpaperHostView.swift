@@ -35,6 +35,7 @@ final class WallpaperHostView: NSView {
     private let frameLayer = CALayer()
     let playerLayer = AVPlayerLayer()
     private var dimLayer: CALayer?
+    private var transitionLayer: CALayer?
     private var contentCrop: CGRect?
     private var contentMode = WallpaperPlacement.ContentMode.aspectFill
 
@@ -116,7 +117,64 @@ final class WallpaperHostView: NSView {
         posterLayer.frame = frame
         frameLayer.frame = frame
         playerLayer.frame = frame
+        transitionLayer?.frame = frame
+        transitionLayer?.contentsGravity = posterLayer.contentsGravity
     }
+
+    // MARK: - Wallpaper change
+
+    /// Covers the new content with the picture that was on screen before a
+    /// wallpaper change. The layer exists only for the length of the change.
+    func setTransitionImage(_ image: CGImage?) {
+        withoutImplicitAnimations {
+            transitionLayer?.removeFromSuperlayer()
+            transitionLayer = nil
+            guard let image else { return }
+
+            let layer = CALayer()
+            configure(layer: layer)
+            layer.actions?["opacity"] = NSNull()
+            layer.contents = image
+            layer.masksToBounds = true
+            layer.frame = posterLayer.frame
+            layer.contentsGravity = posterLayer.contentsGravity
+            // Below the dimming layer, so old and new are dimmed alike.
+            if let dimLayer {
+                self.layer?.insertSublayer(layer, below: dimLayer)
+            } else {
+                self.layer?.addSublayer(layer)
+            }
+            transitionLayer = layer
+        }
+    }
+
+    /// Dissolves the previous picture into the new wallpaper. The animation
+    /// runs in the render server: the app does no work per frame.
+    func fadeOutTransitionImage(duration: TimeInterval) {
+        guard let layer = transitionLayer else { return }
+        transitionLayer = nil
+
+        guard duration > 0 else {
+            withoutImplicitAnimations { layer.removeFromSuperlayer() }
+            return
+        }
+
+        CATransaction.begin()
+        CATransaction.setCompletionBlock {
+            layer.removeFromSuperlayer()
+        }
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1
+        fade.toValue = 0
+        fade.duration = duration
+        fade.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        layer.opacity = 0
+        layer.add(fade, forKey: "fade")
+        CATransaction.commit()
+    }
+
+    /// Whether the previous picture is still covering the content; used by tests.
+    var hasTransitionImage: Bool { transitionLayer != nil }
 
     /// Frame of the content layers in view coordinates; used by tests.
     var contentLayerFrame: CGRect { frameLayer.frame }

@@ -38,6 +38,12 @@ final class AppCoordinator {
     @ObservationIgnored private var scheduledReconcileTask: Task<Void, Never>?
     @ObservationIgnored private var reevaluationTask: Task<Void, Never>?
     @ObservationIgnored private var occlusionPollTimer: Timer?
+    /// The one timer of the schedule: armed for the next playlist change,
+    /// and only while somebody can see the desktop.
+    @ObservationIgnored private var playlistTimer: Timer?
+    /// The last resolve kept playlist items in place because the desktop
+    /// was not visible.
+    @ObservationIgnored private var isHoldingPlaylists = false
     @ObservationIgnored private var restoreGate = StartupRestoreGate()
     @ObservationIgnored private var startupIssues: [StorageIssue] = []
     @ObservationIgnored private var hasLoadedPersistedState = false
@@ -125,6 +131,7 @@ final class AppCoordinator {
                 $0.visibleSessions = Set(sessions.filter { $0.windowState == .visible }.map(\.id))
             }
             self.updateOcclusionPolling()
+            self.desktopVisibilityMayHaveChanged()
             self.statusItemController.refresh()
         }
 
@@ -160,6 +167,9 @@ final class AppCoordinator {
         self.statusItemController.onApplyWallpaper = { [weak self] assetID, displayUUID in
             self?.applyWallpaper(assetID, toDisplayUUID: displayUUID)
         }
+        self.statusItemController.onNextWallpaper = { [weak self] in
+            self?.advancePlaylists()
+        }
         self.statusItemController.onQuit = {
             NSApp.terminate(nil)
         }
@@ -189,6 +199,8 @@ final class AppCoordinator {
         reevaluationTask?.cancel()
         occlusionPollTimer?.invalidate()
         occlusionPollTimer = nil
+        playlistTimer?.invalidate()
+        playlistTimer = nil
         systemMonitor.stop()
         metricsSubscriber.stop()
         await sessionManager.stopAll()
@@ -594,6 +606,12 @@ final class AppCoordinator {
         updatePlacements {
             $0.removeAll { $0.assetID == asset.id }
         }
+        if playlists.contains(where: { $0.referencedAssetIDs.contains(asset.id) }) {
+            var updated = playlists
+            for index in updated.indices { updated[index].removeAsset(asset.id) }
+            playlists = updated
+            try? await settingsStore.savePlaylists(playlists)
+        }
 
         do {
             try await assetCatalogStore.saveAssets(assets)
@@ -639,6 +657,10 @@ final class AppCoordinator {
             )
         }
         content.displays = runtimeState.activeDisplays.map { ($0.displayUUID, $0.localizedName) }
+
+        let rotating = activePlaylists
+        content.playlistName = rotating.first?.name
+        content.canAdvancePlaylist = rotating.contains(where: canAdvance)
         return content
     }
 
@@ -922,18 +944,20 @@ final class AppCoordinator {
     private func loadPersistedState() async {
         let loadedPreferences = await settingsStore.loadPreferences()
         let loadedPlacements = await settingsStore.loadPlacements()
+        let loadedPlaylists = await settingsStore.loadPlaylists()
         let loadedAssets = await assetCatalogStore.loadAssets()
         let bookmarkIssue = await permissionStore.load()
 
         preferences = loadedPreferences.value
         placements = loadedPlacements.value
+        playlists = loadedPlaylists.value
         assets = loadedAssets.value
         startupLoginState = startupLoginManager.currentState()
         hasLoadedPersistedState = true
         refreshRuntimeState()
 
         startupIssues.append(
-            contentsOf: [loadedPreferences.issue, loadedPlacements.issue, loadedAssets.issue, bookmarkIssue].compactMap { $0 }
+            contentsOf: [loadedPreferences.issue, loadedPlacements.issue, loadedPlaylists.issue, loadedAssets.issue, bookmarkIssue].compactMap { $0 }
         )
         Log.storage.info("loaded \(self.assets.count) assets, \(self.placements.count) placements, issues=\(self.startupIssues.count)")
         if !startupIssues.isEmpty {
@@ -982,15 +1006,200 @@ final class AppCoordinator {
                 isUserPaused: runtimeState.isUserPaused,
                 now: .now,
                 calendar: .current,
-                isDarkAppearance: runtimeState.isDarkAppearance
+                isDarkAppearance: runtimeState.isDarkAppearance,
+                // With the desktop out of sight, playlists stay where they
+                // are: nothing is switched or prepared until it is back.
+                heldPlaylistItems: desktopIsVisible ? nil : resolution.playlistItems
             )
         )
+        isHoldingPlaylists = !desktopIsVisible && !resolved.playlistItems.isEmpty
         if resolved != resolution {
             resolution = resolved
         }
+        updatePlaylistTimer()
         let focusPaused = resolved.pause == .focus
         if runtimeState.isFocusPaused != focusPaused {
             updateRuntimeState { $0.isFocusPaused = focusPaused }
+        }
+    }
+
+    // MARK: - Playlist schedule
+
+    /// Whether anybody can see a desktop: the screen is on and unlocked and
+    /// at least one wallpaper window is not suspended.
+    private var desktopIsVisible: Bool {
+        PlaylistTimerPolicy.desktopIsVisible(runtimeState: runtimeState, sessions: activeSessions)
+    }
+
+    /// One timer, for the next change only, with a generous tolerance so
+    /// the system can batch the wake-up. No time-driven playlist in use, or
+    /// no visible desktop: no timer at all.
+    private func updatePlaylistTimer() {
+        playlistTimer?.invalidate()
+        playlistTimer = nil
+        guard !isShuttingDown,
+              let schedule = PlaylistTimerPolicy.schedule(
+                nextChange: resolution.nextChange, desktopIsVisible: desktopIsVisible, now: .now
+              ) else { return }
+
+        let timer = Timer(fire: schedule.fireDate, interval: 0, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.playlistTimer = nil
+                self?.reconcileImmediately(reason: "playlist_advance")
+            }
+        }
+        timer.tolerance = schedule.tolerance
+        RunLoop.main.add(timer, forMode: .common)
+        playlistTimer = timer
+    }
+
+    /// Called when sessions change. A desktop that just became visible gets
+    /// the item that is right for the current time; one that just stopped
+    /// being visible stops the timer.
+    private func desktopVisibilityMayHaveChanged() {
+        if desktopIsVisible {
+            let isOverdue = resolution.nextChange.map { $0 <= .now } ?? false
+            if isHoldingPlaylists || (isOverdue && playlistTimer == nil) {
+                isHoldingPlaylists = false
+                reconcileImmediately(reason: "desktop_visible")
+            } else if playlistTimer == nil, resolution.nextChange != nil {
+                updatePlaylistTimer()
+            }
+        } else if playlistTimer != nil {
+            playlistTimer?.invalidate()
+            playlistTimer = nil
+        }
+    }
+
+    /// Playlists that decide what at least one display shows right now.
+    var activePlaylists: [WallpaperPlaylist] {
+        let ids = resolution.activePlaylistIDs
+        return playlists.filter { ids.contains($0.id) }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private func canAdvance(_ playlist: WallpaperPlaylist) -> Bool {
+        guard playlist.kind == .interval else { return false }
+        let usable = Set(assets.filter(\.isReadyForRotation).map(\.id))
+        return playlist.assetIDs.filter(usable.contains).count > 1
+    }
+
+    /// "Next wallpaper": moves every interval playlist in rotation one step
+    /// on. Returns whether any playlist could advance.
+    @discardableResult
+    func advancePlaylists() -> Bool {
+        let targets = Set(activePlaylists.filter(canAdvance).map(\.id))
+        guard !targets.isEmpty else { return false }
+        var updated = playlists
+        for index in updated.indices where targets.contains(updated[index].id) {
+            updated[index].manualOffset += 1
+        }
+        playlists = updated
+        persistPlaylistsAndReconcile(reason: "playlist_next")
+        return true
+    }
+
+    @discardableResult
+    func createPlaylist(name: String? = nil) -> WallpaperPlaylist {
+        let existing = Set(playlists.map(\.name))
+        var candidate = name ?? String(localized: "New playlist")
+        var suffix = 2
+        while existing.contains(candidate) {
+            candidate = "\(name ?? String(localized: "New playlist")) \(suffix)"
+            suffix += 1
+        }
+        let playlist = WallpaperPlaylist(id: UUID(), name: candidate, anchor: .now)
+        playlists = playlists + [playlist]
+        persistPlaylistsAndReconcile(reason: "playlist_created")
+        return playlist
+    }
+
+    func updatePlaylist(_ playlist: WallpaperPlaylist) {
+        guard let index = playlists.firstIndex(where: { $0.id == playlist.id }), playlists[index] != playlist else { return }
+        var updated = playlists
+        var value = playlist
+        value.intervalSeconds = max(value.intervalSeconds, WallpaperPlaylist.minimumInterval)
+        updated[index] = value
+        playlists = updated
+        persistPlaylistsAndReconcile(reason: "playlist_changed")
+    }
+
+    func deletePlaylist(_ playlistID: UUID) {
+        guard playlists.contains(where: { $0.id == playlistID }) else { return }
+        playlists = playlists.filter { $0.id != playlistID }
+        // Placements fall back to their fixed wallpaper.
+        updatePlacements { placements in
+            for index in placements.indices where placements[index].playlistID == playlistID {
+                placements[index].playlistID = nil
+            }
+        }
+        Task {
+            try? await settingsStore.savePlacements(placements)
+        }
+        persistPlaylistsAndReconcile(reason: "playlist_deleted")
+    }
+
+    func playlist(withID id: UUID?) -> WallpaperPlaylist? {
+        guard let id else { return nil }
+        return playlists.first { $0.id == id }
+    }
+
+    /// The playlist saved for every display, when there is one.
+    var globalPlaylistID: UUID? {
+        guard let id = globalPlacement?.playlistID, playlists.contains(where: { $0.id == id }) else { return nil }
+        return id
+    }
+
+    /// The playlist saved for this display alone.
+    func ownPlaylistID(for display: DisplayTarget) -> UUID? {
+        placements.first { $0.applies(toDisplayUUID: display.displayUUID) }?.playlistID
+    }
+
+    /// Puts a playlist in rotation on one display or, with `display == nil`,
+    /// on all of them. `nil` goes back to the fixed wallpaper. Activating a
+    /// playlist restarts it from its first item.
+    func activatePlaylist(_ playlistID: UUID?, on display: DisplayTarget? = nil) {
+        if let playlistID {
+            guard let index = playlists.firstIndex(where: { $0.id == playlistID }) else { return }
+            var updated = playlists
+            updated[index].anchor = .now
+            updated[index].manualOffset = 0
+            playlists = updated
+        }
+        // The fixed wallpaper under the playlist: what it had, or the
+        // playlist's first item.
+        let fallback = playlistID.flatMap { id in playlists.first { $0.id == id }?.referencedAssetIDs.first }
+
+        updatePlacements { placements in
+            let matches: (WallpaperPlacement) -> Bool = { placement in
+                display.map { placement.applies(toDisplayUUID: $0.displayUUID) } ?? placement.isGlobal
+            }
+            if let index = placements.firstIndex(where: matches) {
+                placements[index].playlistID = playlistID
+            } else if let playlistID, let fallback {
+                placements.append(
+                    WallpaperPlacement(
+                        assetID: fallback,
+                        scope: display.map { .specificDisplay($0.displayUUID) } ?? .allDisplays,
+                        playlistID: playlistID
+                    )
+                )
+            }
+        }
+
+        Task {
+            try? await settingsStore.savePlaylists(playlists)
+        }
+        persistPlacementsAndReconcile(reason: playlistID == nil ? "playlist_deactivated" : "playlist_activated")
+    }
+
+    private func persistPlaylistsAndReconcile(reason: String) {
+        Task {
+            do {
+                try await settingsStore.savePlaylists(playlists)
+                scheduleReconcile(trigger: .manual, reason: reason)
+            } catch {
+                present(error)
+            }
         }
     }
 

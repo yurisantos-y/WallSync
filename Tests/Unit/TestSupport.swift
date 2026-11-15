@@ -149,6 +149,10 @@ final class FakeSurface: WallpaperSurface {
     func update(displayTarget: DisplayTarget) { self.displayTarget = displayTarget }
     func setContentMode(_ contentMode: WallpaperPlacement.ContentMode) { self.contentMode = contentMode }
     func setPoster(_ image: CGImage?) { posterSetCount += 1 }
+    private(set) var transitionImages: [CGImage?] = []
+    private(set) var fadeDurations: [TimeInterval] = []
+    func setTransitionImage(_ image: CGImage?) { transitionImages.append(image) }
+    func fadeOutTransitionImage(duration: TimeInterval) { fadeDurations.append(duration) }
     private(set) var cropHistory: [CGRect?] = []
     var crop: CGRect? { cropHistory.last ?? nil }
     func setContentCrop(_ crop: CGRect?) { cropHistory.append(crop) }
@@ -185,6 +189,7 @@ final class FakeEngine: SharedPlaybackEngine {
     var liveCount: Int { attached.values.filter { $0 }.count }
 
     func prepare(url: URL, maximumPixelSize: CGSize?, startTime: TimeInterval) async throws {
+        environment.events.append("prepare")
         prepareAttempts.append(url)
         startTimes.append(startTime)
         maximumPixelSizes.append(maximumPixelSize)
@@ -200,9 +205,14 @@ final class FakeEngine: SharedPlaybackEngine {
     func setLive(_ isLive: Bool, for surface: any WallpaperSurface) { attached[ObjectIdentifier(surface)] = isLive }
     func setPlaying(_ isPlaying: Bool) { self.isPlaying = isPlaying }
     func setPlaybackRate(_ rate: Double) { playbackRates.append(rate) }
-    func snapshotCurrentFrame() async -> CGImage? { nil }
+    func snapshotCurrentFrame() async -> CGImage? {
+        snapshotCount += 1
+        return environment.snapshotImage
+    }
+    private(set) var snapshotCount = 0
 
     func teardown() {
+        if preparedURL != nil { environment.events.append("teardown") }
         teardownCount += 1
         preparedURL = nil
         isPlaying = false
@@ -214,6 +224,11 @@ final class FakeEnvironment: SessionEnvironment {
     private(set) var surfaces: [FakeSurface] = []
     private(set) var engines: [FakeEngine] = []
     var failingURLs: Set<URL> = []
+    /// What engines return as their current frame.
+    var snapshotImage: CGImage?
+    /// Order in which engines were torn down and prepared, for tests that
+    /// care about decoders overlapping.
+    var events: [String] = []
     var prepareGate = AsyncGate(open: true)
     var windowSnapshot = WindowListSnapshot(windows: [])
     private(set) var windowSnapshotCaptureCount = 0

@@ -3,15 +3,26 @@ import Foundation
 actor SettingsStore: SettingsStoring {
     private let defaults: UserDefaults
     private let placementsURL: URL
+    private let playlistsURL: URL
 
     private enum DefaultsKeys {
         static let preferences = "wallpaper.preferences"
         static let corruptedPreferences = "wallpaper.preferences.corrupt"
     }
 
-    init(defaults: UserDefaults = .standard, placementsURL: URL) {
+    init(defaults: UserDefaults = .standard, placementsURL: URL, playlistsURL: URL? = nil) {
         self.defaults = defaults
         self.placementsURL = placementsURL
+        self.playlistsURL = playlistsURL
+            ?? placementsURL.deletingLastPathComponent().appendingPathComponent("playlists.json")
+    }
+
+    func loadPlaylists() -> StoreLoadResult<[WallpaperPlaylist]> {
+        JSONFile.load([WallpaperPlaylist].self, from: playlistsURL, defaultValue: [])
+    }
+
+    func savePlaylists(_ playlists: [WallpaperPlaylist]) throws {
+        try JSONFile.save(playlists, to: playlistsURL)
     }
 
     func loadPreferences() -> StoreLoadResult<UserPreferences> {

@@ -86,6 +86,9 @@ final class WallpaperSessionManager {
     private let fullscreenDetector = FullscreenWindowDetector()
     private var lastFullscreenDisplayUUIDs: Set<String> = []
 
+    /// Length of the dissolve from one wallpaper to the next.
+    static let wallpaperChangeFadeDuration: TimeInterval = 0.8
+
     private var sessions: [String: SessionRuntime] = [:]
     private var groups: [String: PlaybackGroup] = [:]
 
@@ -267,12 +270,44 @@ final class WallpaperSessionManager {
         )
 
         // 1. Remove sessions whose display is gone or whose asset changed.
+        //
+        // A display that stays and gets another wallpaper (playlist advance,
+        // manual choice) changes with a short dissolve: the picture it shows
+        // now is kept as a still over the new window and faded away once the
+        // new wallpaper is in place. The old window stays up, untouched,
+        // until the new one covers it. The outgoing decoder is released in
+        // step 4, before the incoming one is prepared, so the two never run
+        // side by side — the dissolve is from a still frame to live video.
+        var outgoingImages: [String: CGImage] = [:]
+        var retiredSurfaces: [(surface: any WallpaperSurface, engine: (any SharedPlaybackEngine)?)] = []
         for displayID in Array(sessions.keys) {
             guard let runtime = sessions[displayID] else { continue }
-            if desiredByDisplay[displayID]?.asset.id != runtime.asset.id {
-                removeSession(displayID)
+            guard desiredByDisplay[displayID]?.asset.id != runtime.asset.id else { continue }
+
+            // Only for a desktop somebody can see; otherwise nothing is
+            // captured and the window is simply replaced.
+            let isChange = desiredByDisplay[displayID] != nil
+            if isChange, runtime.mode != .suspend, !request.runtimeState.isInvisibleToUser {
+                var image: CGImage?
+                if let group = groups[groupKey(for: runtime)], group.isPrepared, runtime.isAttached {
+                    image = await group.engine.snapshotCurrentFrame()
+                }
+                if image == nil {
+                    image = await environment.loadPoster(relativePath: runtime.posterPath)
+                }
+                if let image {
+                    outgoingImages[displayID] = image
+                    sessions[displayID] = nil
+                    runtime.surface.onOcclusionChange = nil
+                    retiredSurfaces.append(
+                        (runtime.surface, runtime.isAttached ? groups[groupKey(for: runtime)]?.engine : nil)
+                    )
+                    continue
+                }
             }
+            removeSession(displayID)
         }
+        var incomingSurfaces: [any WallpaperSurface] = []
 
         // 2. Create missing sessions, refresh existing ones.
         for item in desired {
@@ -295,6 +330,12 @@ final class WallpaperSessionManager {
                 surface.setContentMode(item.placement.contentMode)
                 surface.setPoster(poster)
                 surface.showPoster()
+                if let outgoing = outgoingImages[displayID] {
+                    // On screen at once, showing what the display showed.
+                    surface.setTransitionImage(outgoing)
+                    surface.show()
+                    incomingSurfaces.append(surface)
+                }
                 surface.onOcclusionChange = { [weak self] in
                     self?.reevaluate(reason: "window_occlusion_changed")
                 }
@@ -397,6 +438,16 @@ final class WallpaperSessionManager {
             }
 
             await applyPolicy(to: group, members: members, request: request)
+        }
+
+        // The new wallpapers are in place: let the previous picture go.
+        let fade = request.runtimeState.reduceMotionEnabled ? 0 : Self.wallpaperChangeFadeDuration
+        for surface in incomingSurfaces {
+            surface.fadeOutTransitionImage(duration: fade)
+        }
+        for retired in retiredSurfaces {
+            retired.engine?.detach(retired.surface)
+            retired.surface.close()
         }
 
         publishSessions()

@@ -169,6 +169,22 @@
         }
       }
     },
+    "A playlist changes the wallpaper by itself. The wallpaper chosen above is used while the playlist has nothing to show.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A playlist changes the wallpaper by itself. The wallpaper chosen above is used while the playlist has nothing to show."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uma playlist troca o wallpaper sozinha. O wallpaper escolhido acima é usado enquanto a playlist não tem nada para mostrar."
+          }
+        }
+      }
+    },
     "A sharper copy could not be made because the original file cannot be reached. The current copy is kept.": {
       "localizations": {
         "en": {
@@ -201,6 +217,54 @@
         }
       }
     },
+    "Add time": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add time"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicionar horário"
+          }
+        }
+      }
+    },
+    "Add wallpaper": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add wallpaper"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicionar wallpaper"
+          }
+        }
+      }
+    },
+    "Add wallpapers to this playlist.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add wallpapers to this playlist."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicione wallpapers a esta playlist."
+          }
+        }
+      }
+    },
     "Adds extra dimming while macOS uses the dark appearance, and removes it in the light appearance.": {
       "localizations": {
         "en": {
@@ -213,6 +277,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Acrescenta escurecimento enquanto o macOS usa a aparência escura e o remove na aparência clara."
+          }
+        }
+      }
+    },
+    "Advance": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Advance"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avanço"
+          }
+        }
+      }
+    },
+    "After a while": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "After a while"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Por intervalo"
           }
         }
       }
@@ -529,6 +625,22 @@
         }
       }
     },
+    "By time of day": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "By time of day"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Por horário"
+          }
+        }
+      }
+    },
     "Cancel": {
       "localizations": {
         "en": {
@@ -577,6 +689,22 @@
         }
       }
     },
+    "Change every": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change every"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trocar a cada"
+          }
+        }
+      }
+    },
     "Choose one or more videos to use as wallpaper.": {
       "localizations": {
         "en": {
@@ -621,6 +749,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Escolha se os wallpapers iniciam sozinhos."
+          }
+        }
+      }
+    },
+    "Chosen by a Focus filter": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chosen by a Focus filter"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escolhido por um filtro de Foco"
           }
         }
       }
@@ -721,6 +865,22 @@
         }
       }
     },
+    "Create a playlist, add wallpapers from your library and choose how it advances.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create a playlist, add wallpapers from your library and choose how it advances."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crie uma playlist, adicione wallpapers da biblioteca e escolha como ela avança."
+          }
+        }
+      }
+    },
     "Critical": {
       "localizations": {
         "en": {
@@ -785,6 +945,22 @@
         }
       }
     },
+    "Dark appearance": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark appearance"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aparência escura"
+          }
+        }
+      }
+    },
     "Darkens every wallpaper so icons and widgets stay easy to read. Each wallpaper can have its own value in the library.": {
       "localizations": {
         "en": {
@@ -813,6 +989,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vídeo decodificado"
+          }
+        }
+      }
+    },
+    "Delete": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apagar"
+          }
+        }
+      }
+    },
+    "Delete the playlist %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the playlist %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apagar a playlist %@"
           }
         }
       }
@@ -1249,6 +1457,22 @@
         }
       }
     },
+    "From the playlist “%@”": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From the playlist “%@”"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Da playlist “%@”"
+          }
+        }
+      }
+    },
     "Fullscreen app": {
       "localizations": {
         "en": {
@@ -1325,6 +1549,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Posição horizontal"
+          }
+        }
+      }
+    },
+    "How %@ advances": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How %@ advances"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Como %@ avança"
           }
         }
       }
@@ -1457,6 +1697,22 @@
         }
       }
     },
+    "In rotation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In rotation"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Em rotação"
+          }
+        }
+      }
+    },
     "Library": {
       "localizations": {
         "en": {
@@ -1469,6 +1725,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Biblioteca"
+          }
+        }
+      }
+    },
+    "Light and dark": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Light and dark"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claro e escuro"
+          }
+        }
+      }
+    },
+    "Light appearance": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Light appearance"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aparência clara"
           }
         }
       }
@@ -1617,6 +1905,22 @@
         }
       }
     },
+    "Name": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Name"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nome"
+          }
+        }
+      }
+    },
     "Needs at least two displays using the wallpaper for all displays.": {
       "localizations": {
         "en": {
@@ -1629,6 +1933,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Requer pelo menos dois monitores usando o wallpaper de todos os monitores."
+          }
+        }
+      }
+    },
+    "New playlist": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New playlist"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nova playlist"
           }
         }
       }
@@ -1693,6 +2013,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nenhum bom ponto de loop foi encontrado. Ajuste manualmente."
+          }
+        }
+      }
+    },
+    "No playlist": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No playlist"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma playlist"
+          }
+        }
+      }
+    },
+    "No playlists yet": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No playlists yet"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma playlist ainda"
           }
         }
       }
@@ -2321,6 +2673,70 @@
         }
       }
     },
+    "Playlist": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist"
+          }
+        }
+      }
+    },
+    "Playlist for %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist for %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist de %@"
+          }
+        }
+      }
+    },
+    "Playlist for all displays": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist for all displays"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist de todos os monitores"
+          }
+        }
+      }
+    },
+    "Playlist name": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist name"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nome da playlist"
+          }
+        }
+      }
+    },
     "Playlist: %@": {
       "localizations": {
         "en": {
@@ -2333,6 +2749,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Playlist: %@"
+          }
+        }
+      }
+    },
+    "Playlists": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlists"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlists"
           }
         }
       }
@@ -2577,6 +3009,54 @@
         }
       }
     },
+    "Remove %@ from the playlist": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove %@ from the playlist"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover %@ da playlist"
+          }
+        }
+      }
+    },
+    "Remove this time": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove this time"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover este horário"
+          }
+        }
+      }
+    },
+    "Removed wallpaper": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removed wallpaper"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wallpaper removido"
+          }
+        }
+      }
+    },
     "Reset": {
       "localizations": {
         "en": {
@@ -2705,6 +3185,22 @@
         }
       }
     },
+    "Sets of wallpapers that change after a while, by time of day, or with the light and dark appearance.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sets of wallpapers that change after a while, by time of day, or with the light and dark appearance."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conjuntos de wallpapers que mudam por intervalo, por horário ou com a aparência clara e escura."
+          }
+        }
+      }
+    },
     "Settings": {
       "localizations": {
         "en": {
@@ -2733,6 +3229,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostrar um quadro estático quando Reduzir Movimento estiver ativado"
+          }
+        }
+      }
+    },
+    "Shuffle": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shuffle"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aleatório"
           }
         }
       }
@@ -2845,6 +3357,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Iniciar os wallpapers quando o app abrir"
+          }
+        }
+      }
+    },
+    "Starts at": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Starts at"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Começa às"
           }
         }
       }
@@ -3597,6 +4125,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Wallpapers"
+          }
+        }
+      }
+    },
+    "Wallpapers still being optimized are skipped until they are ready.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wallpapers still being optimized are skipped until they are ready."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wallpapers ainda em otimização são pulados até ficarem prontos."
+          }
+        }
+      }
+    },
+    "Wallpapers that change by themselves.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wallpapers that change by themselves."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wallpapers que mudam sozinhos."
           }
         }
       }

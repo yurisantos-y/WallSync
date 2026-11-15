@@ -54,6 +54,8 @@ struct SettingsView: View {
             LibraryView()
         case .displays:
             DisplaysView()
+        case .playlists:
+            PlaylistsView()
         case .general:
             GeneralSettingsView()
         case .energy:
@@ -69,6 +71,7 @@ struct SettingsView: View {
 enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
     case library
     case displays
+    case playlists
     case general
     case energy
     case startup
@@ -82,6 +85,8 @@ enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
             return String(localized: "Library")
         case .displays:
             return String(localized: "Displays")
+        case .playlists:
+            return String(localized: "Playlists")
         case .general:
             return String(localized: "General")
         case .energy:
@@ -99,6 +104,8 @@ enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
             return String(localized: "Your videos and the wallpaper for all displays.")
         case .displays:
             return String(localized: "A wallpaper for each display.")
+        case .playlists:
+            return String(localized: "Wallpapers that change by themselves.")
         case .general:
             return String(localized: "App behavior and playback quality.")
         case .energy:
@@ -116,6 +123,8 @@ enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
             return "film.stack"
         case .displays:
             return "display.2"
+        case .playlists:
+            return "rectangle.stack"
         case .general:
             return "gearshape"
         case .energy:
@@ -129,7 +138,7 @@ enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
 
     var group: SidebarGroup {
         switch self {
-        case .library, .displays:
+        case .library, .displays, .playlists:
             return .workspace
         case .general, .energy, .startup, .diagnostics:
             return .preferences

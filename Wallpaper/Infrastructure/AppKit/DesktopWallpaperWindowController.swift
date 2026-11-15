@@ -57,6 +57,14 @@ final class DesktopWallpaperWindowController: NSWindowController, WallpaperSurfa
         hostView.setPoster(image)
     }
 
+    func setTransitionImage(_ image: CGImage?) {
+        hostView.setTransitionImage(image)
+    }
+
+    func fadeOutTransitionImage(duration: TimeInterval) {
+        hostView.fadeOutTransitionImage(duration: duration)
+    }
+
     func setContentCrop(_ crop: CGRect?) {
         hostView.setContentCrop(crop)
     }

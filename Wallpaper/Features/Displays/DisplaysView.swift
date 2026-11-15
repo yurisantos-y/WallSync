@@ -66,6 +66,23 @@ struct DisplaysView: View {
             }
             .pickerStyle(.menu)
 
+            if !coordinator.playlists.isEmpty {
+                Picker(
+                    "Playlist for all displays",
+                    selection: Binding<UUID?>(
+                        get: { coordinator.globalPlaylistID },
+                        set: { coordinator.activatePlaylist($0) }
+                    )
+                ) {
+                    Text("No playlist").tag(Optional<UUID>.none)
+                    ForEach(coordinator.playlists) { playlist in
+                        Text(playlist.name).tag(Optional(playlist.id))
+                    }
+                }
+                .pickerStyle(.menu)
+                .help(Text("A playlist changes the wallpaper by itself. The wallpaper chosen above is used while the playlist has nothing to show."))
+            }
+
             panoramaControls
 
             HStack(spacing: 10) {

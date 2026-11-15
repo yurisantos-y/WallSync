@@ -17,6 +17,10 @@ protocol WallpaperSurface: AnyObject {
     /// The part of the picture this display shows (unit rectangle, origin
     /// top-left) when one video spans several displays; `nil` shows it all.
     func setContentCrop(_ crop: CGRect?)
+    /// Shows `image` — the picture the display had a moment ago — over the
+    /// new content, until `fadeOutTransitionImage` dissolves it away.
+    func setTransitionImage(_ image: CGImage?)
+    func fadeOutTransitionImage(duration: TimeInterval)
     /// A colour laid over poster and video alike; `nil` removes it.
     func setDimming(_ overlay: DimOverlay?)
     func showPoster()
@@ -50,6 +54,8 @@ protocol SharedPlaybackEngine: AnyObject {
 }
 
 extension WallpaperSurface {
+    func setTransitionImage(_ image: CGImage?) {}
+    func fadeOutTransitionImage(duration: TimeInterval) {}
     func setContentCrop(_ crop: CGRect?) {}
     func setDimming(_ overlay: DimOverlay?) {}
 }

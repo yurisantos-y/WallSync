@@ -15,6 +15,7 @@ struct StorageLocations: Sendable, Equatable {
     var assetsFile: URL { root.appendingPathComponent("assets.json") }
     var placementsFile: URL { root.appendingPathComponent("placements.json") }
     var bookmarksFile: URL { root.appendingPathComponent("bookmarks.json") }
+    var playlistsFile: URL { root.appendingPathComponent("playlists.json") }
     var optimizedDirectory: URL { root.appendingPathComponent(Self.optimizedDirectoryName, isDirectory: true) }
     var postersDirectory: URL { root.appendingPathComponent(Self.postersDirectoryName, isDirectory: true) }
     var desktopPicturesDirectory: URL { root.appendingPathComponent(Self.desktopPicturesDirectoryName, isDirectory: true) }
