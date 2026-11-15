@@ -26,6 +26,9 @@ final class AppCoordinator {
     @ObservationIgnored private var optimizationTasks: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored private var optimizationQueueTail: Task<Void, Never>?
     @ObservationIgnored private var reoptimizationAttempted: Set<UUID> = []
+    /// The recipe each asset was last (re)optimized for in this launch, so an
+    /// edit that cannot be applied is not retried on every event.
+    @ObservationIgnored private var recipeAttempted: [UUID: EditRecipe] = [:]
     @ObservationIgnored private var isShuttingDown = false
     @ObservationIgnored private let statusItemController: StatusItemController
     @ObservationIgnored private let systemMonitor: SystemEventMonitor
@@ -42,6 +45,12 @@ final class AppCoordinator {
 
     var assets: [WallpaperAsset] = []
     var placements: [WallpaperPlacement] = []
+    var playlists: [WallpaperPlaylist] = []
+    /// Temporary instruction from a Focus filter; never persisted into the
+    /// user's assignments.
+    var focusOverride: FocusOverride?
+    /// What every display shows right now, as decided by `WallpaperResolver`.
+    private(set) var resolution = WallpaperResolver.Output()
     var preferences: UserPreferences = .defaultValue
     var runtimeState: AppRuntimeState = .initial
     var activeSessions: [RenderSession] = []
@@ -307,6 +316,8 @@ final class AppCoordinator {
         defer {
             importActivities[assetID] = nil
             optimizationTasks[assetID] = nil
+            // The recipe may have been edited again while this one ran.
+            scheduleMaintenanceOptimizations()
         }
 
         guard let asset = assets.first(where: { $0.id == assetID }) else { return }
@@ -409,10 +420,24 @@ final class AppCoordinator {
             enqueueOptimization(for: asset.id, kind: .resume)
         }
 
+        // Edited since the rendition was made: apply the recipe, whether or
+        // not the asset is on a display right now.
+        for asset in assets
+        where asset.optimizationState == .ready
+            && optimizationTasks[asset.id] == nil
+            && OptimizationPlanner.isStale(asset: asset)
+            && recipeAttempted[asset.id] != asset.editRecipe {
+            recipeAttempted[asset.id] = asset.editRecipe
+            Log.importing.info("asset \(asset.id.uuidString, privacy: .public): edits changed, producing a new rendition")
+            enqueueOptimization(for: asset.id, kind: .reoptimization)
+        }
+
         let displays = runtimeState.activeDisplays
         guard !displays.isEmpty else { return }
         let maximumPixelSize = displays.largestPixelSize
         let assetsInUse = Set(placements.filter(\.isEnabled).map(\.assetID))
+            .union(resolution.displays.map(\.assetID))
+            .union(playlists.flatMap(\.referencedAssetIDs))
 
         for asset in assets
         where assetsInUse.contains(asset.id)
@@ -427,6 +452,30 @@ final class AppCoordinator {
             reoptimizationAttempted.insert(asset.id)
             Log.importing.info("asset \(asset.id.uuidString, privacy: .public): a better rendition is possible, reoptimizing")
             enqueueOptimization(for: asset.id, kind: .reoptimization)
+        }
+    }
+
+    /// Stores new edits for an asset. The current rendition keeps playing
+    /// while a new one is produced in the background, then playback switches
+    /// to it without interruption.
+    func updateEditRecipe(_ recipe: EditRecipe, for assetID: UUID) {
+        guard let index = assets.firstIndex(where: { $0.id == assetID }) else { return }
+        let normalized = recipe.normalized(duration: assets[index].duration)
+        guard assets[index].editRecipe != normalized else { return }
+
+        updateAssets {
+            $0[index].editRecipe = normalized
+            $0[index].originalUnavailable = false
+        }
+        recipeAttempted[assetID] = nil
+
+        Task {
+            do {
+                try await assetCatalogStore.saveAssets(assets)
+            } catch {
+                present(error)
+            }
+            scheduleMaintenanceOptimizations()
         }
     }
 
@@ -522,8 +571,10 @@ final class AppCoordinator {
         placement(for: display)?.contentMode ?? .aspectFill
     }
 
+    /// The wallpaper the display shows now, after playlists and Focus.
     func effectiveAsset(for display: DisplayTarget) -> WallpaperAsset? {
-        guard let assetID = assignedAssetID(for: display) else { return nil }
+        let assetID = resolution.content(forDisplayUUID: display.displayUUID)?.assetID ?? assignedAssetID(for: display)
+        guard let assetID else { return nil }
         return assets.first { $0.id == assetID }
     }
 
@@ -739,14 +790,39 @@ final class AppCoordinator {
         }
     }
 
+    /// Runs the one function that decides what each display shows.
+    private func resolveWallpapers() {
+        let resolved = WallpaperResolver.resolve(
+            WallpaperResolver.Input(
+                displays: runtimeState.activeDisplays,
+                placements: placements,
+                playlists: playlists,
+                assets: assets,
+                focus: focusOverride,
+                isUserPaused: runtimeState.isUserPaused,
+                now: .now,
+                calendar: .current,
+                isDarkAppearance: runtimeState.isDarkAppearance
+            )
+        )
+        if resolved != resolution {
+            resolution = resolved
+        }
+        let focusPaused = resolved.pause == .focus
+        if runtimeState.isFocusPaused != focusPaused {
+            updateRuntimeState { $0.isFocusPaused = focusPaused }
+        }
+    }
+
     private func makeReconcileRequest(reason: String) -> SessionReconcileRequest {
         refreshRuntimeState()
+        resolveWallpapers()
         syncNativeDesktopPictures()
 
         return SessionReconcileRequest(
             displays: runtimeState.activeDisplays,
             assets: assets,
-            placements: placements,
+            placements: resolution.placements,
             preferences: preferences,
             runtimeState: runtimeState,
             reason: reason
@@ -793,8 +869,6 @@ final class AppCoordinator {
         Task {
             do {
                 try await settingsStore.savePlacements(placements)
-                refreshRuntimeState()
-                syncNativeDesktopPictures()
                 scheduleReconcile(trigger: .manual, reason: reason)
             } catch {
                 present(error)
@@ -936,7 +1010,7 @@ final class AppCoordinator {
             try nativeDesktopPictureManager.syncDesktopPictures(
                 displays: runtimeState.activeDisplays,
                 assets: assets,
-                placements: placements
+                placements: resolution.placements
             )
         } catch {
             present(error)

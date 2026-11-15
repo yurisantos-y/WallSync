@@ -166,6 +166,7 @@ final class AssetImportPipeline {
                     assetID: asset.id,
                     maximumPixelSize: maximumPixelSize,
                     quality: quality,
+                    recipe: asset.editRecipe,
                     progress: progress
                 )
             )

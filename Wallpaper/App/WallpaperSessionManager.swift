@@ -755,6 +755,7 @@ final class WallpaperSessionManager {
             isScreenSaverActive: request.runtimeState.isScreenSaverActive,
             isSessionInactive: request.runtimeState.isSessionInactive,
             isUserPaused: request.runtimeState.isUserPaused,
+            isFocusPaused: request.runtimeState.isFocusPaused,
             reduceMotionEnabled: request.runtimeState.reduceMotionEnabled
         )
     }

@@ -30,6 +30,10 @@ struct AppRuntimeState: Sendable {
 
     /// The user paused every wallpaper from the menu bar.
     var isUserPaused = false
+    /// A Focus filter asked for the wallpapers to be paused.
+    var isFocusPaused = false
+    /// The system is using the dark appearance.
+    var isDarkAppearance = false
     /// System "Reduce motion" accessibility setting.
     var reduceMotionEnabled = false
 

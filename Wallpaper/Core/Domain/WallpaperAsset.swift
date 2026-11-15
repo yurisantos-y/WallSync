@@ -18,6 +18,12 @@ struct OptimizedPlaybackAsset: Codable, Hashable, Sendable {
     var isPassthrough: Bool = false
     var bitDepth: Int = 8
     var isHDR: Bool = false
+    /// The edits this rendition was produced with. When the asset's recipe
+    /// no longer matches, the rendition is stale and is produced again.
+    var recipe: EditRecipe = .empty
+    /// How each marked logo was removed (`WatermarkStrategy` raw values), in
+    /// the order of the recipe's regions.
+    var watermarkStrategies: [String] = []
 }
 
 extension OptimizedPlaybackAsset {
@@ -34,7 +40,9 @@ extension OptimizedPlaybackAsset {
             frameRateCap: try container.decodeIfPresent(Double.self, forKey: .frameRateCap),
             isPassthrough: try container.decodeIfPresent(Bool.self, forKey: .isPassthrough) ?? false,
             bitDepth: try container.decodeIfPresent(Int.self, forKey: .bitDepth) ?? 8,
-            isHDR: try container.decodeIfPresent(Bool.self, forKey: .isHDR) ?? false
+            isHDR: try container.decodeIfPresent(Bool.self, forKey: .isHDR) ?? false,
+            recipe: try container.decodeIfPresent(EditRecipe.self, forKey: .recipe) ?? .empty,
+            watermarkStrategies: try container.decodeIfPresent([String].self, forKey: .watermarkStrategies) ?? []
         )
     }
 }
@@ -70,6 +78,27 @@ struct WallpaperAsset: Codable, Identifiable, Hashable, Sendable {
     var originalUnavailable: Bool = false
     var sourceBitDepth: Int = 8
     var sourceIsHDR: Bool = false
+    /// Non-destructive edits applied by the optimizer.
+    var editRecipe: EditRecipe = .empty
+    /// 0.25 … 1. Slower playback decodes proportionally fewer frames.
+    var playbackRate: Double = 1
+    /// Per-wallpaper dimming; `nil` follows the global setting.
+    var dimmingOverride: Double? = nil
+    /// Last time the wallpaper was put on a display; orders the menu bar list.
+    var lastUsedAt: Date? = nil
+
+    static let playbackRateRange: ClosedRange<Double> = 0.25...1
+
+    /// The rate actually handed to the player.
+    var effectivePlaybackRate: Double {
+        guard playbackRate.isFinite else { return 1 }
+        return min(max(playbackRate, Self.playbackRateRange.lowerBound), Self.playbackRateRange.upperBound)
+    }
+
+    /// Exists, optimized, and therefore allowed into a playlist rotation.
+    var isReadyForRotation: Bool {
+        optimizationState == .ready && optimizedPlayback != nil
+    }
 
     var resolutionDescription: String {
         "\(Int(pixelSize.width))x\(Int(pixelSize.height))"
@@ -105,7 +134,11 @@ extension WallpaperAsset {
                 ?? (optimizedPlayback == nil ? .pending : .ready),
             originalUnavailable: try container.decodeIfPresent(Bool.self, forKey: .originalUnavailable) ?? false,
             sourceBitDepth: try container.decodeIfPresent(Int.self, forKey: .sourceBitDepth) ?? 8,
-            sourceIsHDR: try container.decodeIfPresent(Bool.self, forKey: .sourceIsHDR) ?? false
+            sourceIsHDR: try container.decodeIfPresent(Bool.self, forKey: .sourceIsHDR) ?? false,
+            editRecipe: try container.decodeIfPresent(EditRecipe.self, forKey: .editRecipe) ?? .empty,
+            playbackRate: try container.decodeIfPresent(Double.self, forKey: .playbackRate) ?? 1,
+            dimmingOverride: try container.decodeIfPresent(Double.self, forKey: .dimmingOverride),
+            lastUsedAt: try container.decodeIfPresent(Date.self, forKey: .lastUsedAt)
         )
     }
 }

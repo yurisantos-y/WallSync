@@ -18,6 +18,7 @@ struct SystemContext: Sendable {
     var isSessionInactive = false
 
     var isUserPaused = false
+    var isFocusPaused = false
     var reduceMotionEnabled = false
 
     var isInvisibleToUser: Bool {
@@ -40,6 +41,7 @@ enum SessionModeReason: String, Sendable, CaseIterable {
     case systemSleeping
     case sessionInactive
     case userPaused
+    case focusFilter
     case fullscreen
     case occluded
     case reduceMotion
@@ -84,6 +86,10 @@ final class EnergyPolicyController: Sendable {
 
         if context.isUserPaused {
             return SessionModeDecision(mode: .poster, reason: .userPaused)
+        }
+
+        if context.isFocusPaused {
+            return SessionModeDecision(mode: .poster, reason: .focusFilter)
         }
 
         if context.isFullscreen && preferences.pauseWhenFullscreen {

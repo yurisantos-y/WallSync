@@ -56,7 +56,26 @@ enum OptimizationPlanner {
         static let frameRateTolerance = 0.5
     }
 
-    static func plan(source: SourceVideoDescription, target: OptimizationTarget) -> OptimizationPlan {
+    /// - Parameters:
+    ///   - recipe: the asset's edits. An empty recipe gives exactly the plan
+    ///     an unedited video always got, passthrough included.
+    ///   - trimIsKeyframeAligned: the trimmed range starts on a keyframe and
+    ///     ends on one (or at the end of the video), so the compressed
+    ///     samples can be cut without decoding them.
+    static func plan(
+        source: SourceVideoDescription,
+        target: OptimizationTarget,
+        recipe: EditRecipe = .empty,
+        trimIsKeyframeAligned: Bool = true
+    ) -> OptimizationPlan {
+        // A crop shows only part of the picture; that part is what gets
+        // scaled to the display.
+        var source = source
+        if let crop = recipe.crop {
+            source.pixelSize = CGSize(width: source.pixelSize.width * crop.width, height: source.pixelSize.height * crop.height)
+        }
+        let editsAllowPassthrough = !recipe.changesPixels && (recipe.trim == nil || trimIsKeyframeAligned)
+
         let targetSize = targetPixelSize(sourcePixelSize: source.pixelSize, maximumPixelSize: target.maximumPixelSize)
         let frameRate = targetFrameRate(sourceFrameRate: source.frameRate, quality: target.quality)
         let codecName = source.codec.lowercased()
@@ -78,7 +97,7 @@ enum OptimizationPlanner {
         ) * Constant.passthroughBitRateTolerance
         let bitRateFits = source.bitRate > 0 && source.bitRate <= bitRateCeiling
 
-        if codecIsSuitable && sizeFits && frameRateFits && bitRateFits && !source.hasTransform {
+        if codecIsSuitable && sizeFits && frameRateFits && bitRateFits && !source.hasTransform && editsAllowPassthrough {
             return .passthrough
         }
 
@@ -154,7 +173,11 @@ enum OptimizationPlanner {
             return false
         }
 
-        let idealSize = targetPixelSize(sourcePixelSize: asset.pixelSize, maximumPixelSize: maximumPixelSize)
+        var sourceSize = asset.pixelSize
+        if let crop = asset.editRecipe.normalized(duration: asset.duration).crop {
+            sourceSize = CGSize(width: sourceSize.width * crop.width, height: sourceSize.height * crop.height)
+        }
+        let idealSize = targetPixelSize(sourcePixelSize: sourceSize, maximumPixelSize: maximumPixelSize)
         let idealFrameRate = targetFrameRate(sourceFrameRate: asset.frameRate, quality: quality)
 
         let currentArea = current.pixelSize.width * current.pixelSize.height
@@ -162,7 +185,14 @@ enum OptimizationPlanner {
         let gainsResolution = idealArea > currentArea * 1.02
         let gainsFrameRate = idealFrameRate > current.frameRate + Constant.frameRateTolerance
 
-        return gainsResolution || gainsFrameRate
+        return gainsResolution || gainsFrameRate || isStale(asset: asset)
+    }
+
+    /// The rendition on disk was made with different edits than the asset
+    /// now asks for.
+    static func isStale(asset: WallpaperAsset) -> Bool {
+        guard let current = asset.optimizedPlayback else { return false }
+        return current.recipe != asset.editRecipe.normalized(duration: asset.duration)
     }
 
     private static func evenDimension(_ value: CGFloat) -> CGFloat {

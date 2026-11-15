@@ -63,6 +63,7 @@ extension SessionModeReason {
         case .systemSleeping: return String(localized: "Mac sleeping")
         case .sessionInactive: return String(localized: "Another user is active")
         case .userPaused: return String(localized: "Paused by you")
+        case .focusFilter: return String(localized: "Paused by a Focus")
         case .fullscreen: return String(localized: "Fullscreen app")
         case .occluded: return String(localized: "Desktop covered")
         case .reduceMotion: return String(localized: "Reduce Motion is on")

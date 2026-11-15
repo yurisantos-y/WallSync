@@ -28,6 +28,7 @@ actor VideoAssetOptimizer {
         assetID: UUID,
         maximumPixelSize: CGSize,
         quality: UserPreferences.PlaybackQuality,
+        recipe: EditRecipe = .empty,
         progress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> OptimizedPlaybackAsset {
         let sourceAsset = AVURLAsset(url: sourceURL)

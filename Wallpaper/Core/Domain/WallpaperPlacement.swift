@@ -19,19 +19,62 @@ struct WallpaperPlacement: Codable, Identifiable, Hashable, Sendable {
     var scope: Scope
     var contentMode: ContentMode
     var isEnabled: Bool
+    /// When set, the wallpaper comes from this playlist and `assetID` is only
+    /// the fallback used while the playlist has nothing to show.
+    var playlistID: UUID?
+    /// One video stretched across every display the placement applies to,
+    /// each display showing its own slice.
+    var spansDisplays: Bool
+    /// Which part of the video stays visible when it is larger than the
+    /// displays' bounding box: -1 … 1 on each axis, 0 is centred.
+    var panoramaOffset: CGPoint
 
     init(
         id: UUID = UUID(),
         assetID: UUID,
         scope: Scope,
         contentMode: ContentMode = .aspectFill,
-        isEnabled: Bool = true
+        isEnabled: Bool = true,
+        playlistID: UUID? = nil,
+        spansDisplays: Bool = false,
+        panoramaOffset: CGPoint = .zero
     ) {
         self.id = id
         self.assetID = assetID
         self.scope = scope
         self.contentMode = contentMode
         self.isEnabled = isEnabled
+        self.playlistID = playlistID
+        self.spansDisplays = spansDisplays
+        self.panoramaOffset = panoramaOffset
+    }
+}
+
+extension WallpaperPlacement {
+    /// Tolerant decoding: files written before playlists and panoramas keep
+    /// loading.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            id: try container.decode(UUID.self, forKey: .id),
+            assetID: try container.decode(UUID.self, forKey: .assetID),
+            scope: try container.decode(Scope.self, forKey: .scope),
+            contentMode: (try? container.decodeIfPresent(ContentMode.self, forKey: .contentMode)) ?? .aspectFill,
+            isEnabled: try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true,
+            playlistID: try container.decodeIfPresent(UUID.self, forKey: .playlistID),
+            spansDisplays: try container.decodeIfPresent(Bool.self, forKey: .spansDisplays) ?? false,
+            panoramaOffset: try container.decodeIfPresent(CGPoint.self, forKey: .panoramaOffset) ?? .zero
+        )
+    }
+
+    var isGlobal: Bool {
+        if case .allDisplays = scope { return true }
+        return false
+    }
+
+    func applies(toDisplayUUID displayUUID: String) -> Bool {
+        if case let .specificDisplay(uuid) = scope { return uuid == displayUUID }
+        return false
     }
 }
 
