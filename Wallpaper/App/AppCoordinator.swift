@@ -116,6 +116,7 @@ final class AppCoordinator {
                 $0.visibleSessions = Set(sessions.filter { $0.windowState == .visible }.map(\.id))
             }
             self.updateOcclusionPolling()
+            self.statusItemController.refresh()
         }
 
         self.sessionManager.onFullscreenDisplaysChanged = { [weak self] displayUUIDs in
@@ -129,6 +130,20 @@ final class AppCoordinator {
         }
         self.statusItemController.onOpenSettings = { [weak self] in
             self?.openSettings()
+        }
+        self.statusItemController.onTogglePause = { [weak self] in
+            guard let self else { return }
+            self.setUserPaused(!self.runtimeState.isUserPaused)
+        }
+        self.statusItemController.statusProvider = { [weak self] in
+            guard let self else {
+                return StatusItemController.Status(isPaused: false, summary: "", hasWallpapers: false)
+            }
+            return StatusItemController.Status(
+                isPaused: self.runtimeState.isUserPaused,
+                summary: self.statusSummary.localizedLabel,
+                hasWallpapers: !self.activeSessions.isEmpty
+            )
         }
         self.statusItemController.onQuit = {
             NSApp.terminate(nil)
@@ -180,6 +195,10 @@ final class AppCoordinator {
             sessions: activeSessions,
             assets: assets
         )
+    }
+
+    var statusSummary: StatusSummary {
+        StatusSummary.make(sessions: activeSessions, isUserPaused: runtimeState.isUserPaused)
     }
 
     func dismissError() {
@@ -641,6 +660,7 @@ final class AppCoordinator {
     func setUserPaused(_ paused: Bool) {
         guard runtimeState.isUserPaused != paused else { return }
         updateRuntimeState { $0.isUserPaused = paused }
+        statusItemController.refresh()
         Task {
             await reconcileNow(reason: paused ? "user_paused" : "user_resumed")
         }
@@ -871,7 +891,15 @@ final class AppCoordinator {
 
     private func present(_ error: Error) {
         Log.session.error("presenting error: \(error.localizedDescription, privacy: .public)")
-        lastErrorMessage = error.localizedDescription
+        let message = error.localizedDescription
+        if let current = lastErrorMessage, !current.isEmpty {
+            // Several imports can fail in a row; keep every message.
+            if !current.contains(message) {
+                lastErrorMessage = current + "\n" + message
+            }
+        } else {
+            lastErrorMessage = message
+        }
     }
 
     private func updateAssets(_ mutate: (inout [WallpaperAsset]) -> Void) {

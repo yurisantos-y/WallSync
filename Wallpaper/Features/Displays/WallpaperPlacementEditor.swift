@@ -12,7 +12,7 @@ struct WallpaperPlacementEditor: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(display.localizedName)
                             .font(.title3.weight(.semibold))
-                        Text("\(Int(display.frame.width))x\(Int(display.frame.height)) • \(display.maximumFramesPerSecond) Hz")
+                        Text(verbatim: "\(Int(display.frame.width))x\(Int(display.frame.height)) • \(display.maximumFramesPerSecond) Hz")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -20,14 +20,14 @@ struct WallpaperPlacementEditor: View {
                     Spacer()
 
                     if display.isPrimary {
-                        WallpaperStatusPill(label: "Principal", color: .blue)
+                        WallpaperStatusPill(label: String(localized: "Main display"), color: .blue)
                     }
                 }
 
                 displayStatusRow
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Wallpaper efetivo")
+                    Text("Current wallpaper")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Text(effectiveAssetLabel)
@@ -40,32 +40,34 @@ struct WallpaperPlacementEditor: View {
                 Picker(
                     "Wallpaper",
                     selection: Binding<UUID?>(
-                        get: { coordinator.assignedAssetID(for: display) },
+                        get: { coordinator.hasDisplayOverride(for: display) ? coordinator.assignedAssetID(for: display) : nil },
                         set: { coordinator.assignAsset($0, to: display) }
                     )
                 ) {
-                    Text("Usar fallback/global").tag(Optional<UUID>.none)
+                    Text("Same as all displays").tag(Optional<UUID>.none)
                     ForEach(coordinator.assets) { asset in
                         Text(asset.displayName).tag(Optional(asset.id))
                     }
                 }
                 .pickerStyle(.menu)
                 .disabled(coordinator.assets.isEmpty)
+                .accessibilityLabel(Text("Wallpaper for \(display.localizedName)"))
 
                 Picker(
-                    "Modo",
+                    "Scaling",
                     selection: Binding(
                         get: { coordinator.contentMode(for: display) },
                         set: { coordinator.updateContentMode($0, for: display) }
                     )
                 ) {
-                    Text("Aspect Fill").tag(WallpaperPlacement.ContentMode.aspectFill)
-                    Text("Aspect Fit").tag(WallpaperPlacement.ContentMode.aspectFit)
+                    Text("Fill screen").tag(WallpaperPlacement.ContentMode.aspectFill)
+                    Text("Fit to screen").tag(WallpaperPlacement.ContentMode.aspectFit)
                 }
                 .pickerStyle(.segmented)
+                .accessibilityLabel(Text("Scaling for \(display.localizedName)"))
 
                 HStack {
-                    Button("Usar fallback global") {
+                    Button("Use the wallpaper for all displays") {
                         coordinator.assignAsset(nil, to: display)
                     }
                     .buttonStyle(.bordered)
@@ -74,51 +76,56 @@ struct WallpaperPlacementEditor: View {
                     Spacer()
 
                     if let session = coordinator.session(for: display) {
-                        Text("Sessao: \(session.playbackState.localizedLabel) • \(session.energyMode.localizedLabel)")
+                        Text(verbatim: "\(session.playbackState.localizedLabel) • \(session.modeReason == .none ? session.energyMode.localizedLabel : session.modeReason.localizedLabel)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
-                        Text("Sem sessao ativa")
+                        Text("Not running")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
             }
         }
+        .accessibilityElement(children: .contain)
     }
 
     private var effectiveAssetLabel: String {
-        coordinator.effectiveAsset(for: display)?.displayName ?? "Nenhum wallpaper definido"
+        coordinator.effectiveAsset(for: display)?.displayName ?? String(localized: "No wallpaper chosen")
     }
 
     private var sourceLabel: String {
         if coordinator.hasDisplayOverride(for: display) {
-            return "Origem: atribuicao especifica para este display"
+            return String(localized: "Chosen for this display")
         }
 
         if coordinator.globalAssetID() != nil {
-            return "Origem: fallback do wallpaper global"
+            return String(localized: "Using the wallpaper for all displays")
         }
 
-        return "Origem: sem fallback configurado"
+        return String(localized: "No wallpaper for all displays is set")
     }
 
     private var displayStatusRow: some View {
         HStack(spacing: 8) {
             WallpaperStatusPill(
-                label: coordinator.hasDisplayOverride(for: display) ? "Override" : "Global",
+                label: coordinator.hasDisplayOverride(for: display)
+                    ? String(localized: "Own wallpaper")
+                    : String(localized: "All displays"),
                 color: coordinator.hasDisplayOverride(for: display) ? .blue : .gray
             )
 
             if coordinator.isDisplayFullscreen(display) {
-                WallpaperStatusPill(label: "Fullscreen", color: .orange)
+                WallpaperStatusPill(label: String(localized: "Fullscreen app"), color: .orange)
             }
 
             if let session = coordinator.session(for: display) {
                 WallpaperStatusPill(label: session.playbackState.localizedLabel, color: session.playbackState.color)
-                WallpaperStatusPill(label: session.energyMode.localizedLabel, color: session.energyMode.color)
+                if session.modeReason != .none {
+                    WallpaperStatusPill(label: session.modeReason.localizedLabel, color: session.energyMode.color)
+                }
             } else {
-                WallpaperStatusPill(label: "Idle", color: .gray)
+                WallpaperStatusPill(label: String(localized: "Not running"), color: .gray)
             }
         }
     }

@@ -20,6 +20,7 @@
 		2326612427393FFCD6C1A834 /* ThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84321CD21A29563B1BCFC3F3 /* ThumbnailCache.swift */; };
 		241D0F73643A980908B0570E /* SessionRuntimeProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB688EF1BD7009C298CC1681 /* SessionRuntimeProtocols.swift */; };
 		25F744675D95EB20A2E72C70 /* RenderSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C449B198F1AE6055B5635F7 /* RenderSession.swift */; };
+		26A1928628CF3E56DA7CC006 /* StatusSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 716D925B876774FCFB65EEBB /* StatusSummary.swift */; };
 		2F1173786ADB31092BB27566 /* DesktopWallpaperWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF05AF39461ECF10F8B6B7F /* DesktopWallpaperWindow.swift */; };
 		32D65091ED65DBCD8B5A697B /* WindowListSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B077CE2220ACD293BD4688 /* WindowListSnapshot.swift */; };
 		383B99FDA75EFEA62319B55F /* AccessBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5AE67FEA80F0A059C1E262 /* AccessBookmark.swift */; };
@@ -135,6 +136,7 @@
 		66CA5DFBCD827D8D512B3817 /* SessionReconciliationPolicy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = SessionReconciliationPolicy.swift; path = Wallpaper/Core/Policies/SessionReconciliationPolicy.swift; sourceTree = "<group>"; };
 		6715235EB9D755B8DC48FF4B /* StorageAndPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StorageAndPolicyTests.swift; path = Tests/Unit/StorageAndPolicyTests.swift; sourceTree = "<group>"; };
 		6A30B7E7A7BFF88C9D9D1A50 /* OptimizerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = OptimizerTests.swift; path = Tests/Unit/OptimizerTests.swift; sourceTree = "<group>"; };
+		716D925B876774FCFB65EEBB /* StatusSummary.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StatusSummary.swift; path = Wallpaper/Core/Policies/StatusSummary.swift; sourceTree = "<group>"; };
 		7174A2E713A80764C3421225 /* StatusItemController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StatusItemController.swift; path = Wallpaper/App/StatusItemController.swift; sourceTree = "<group>"; };
 		7192FEBD9257C2FDA742A092 /* DisplayTarget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DisplayTarget.swift; path = Wallpaper/Core/Domain/DisplayTarget.swift; sourceTree = "<group>"; };
 		769C5C6681CCA99AD1B92B83 /* WallpaperPlacementEditor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WallpaperPlacementEditor.swift; path = Wallpaper/Features/Displays/WallpaperPlacementEditor.swift; sourceTree = "<group>"; };
@@ -241,6 +243,7 @@
 				8DE3609A8650828EEBD66D09 /* DiagnosticsSummary.swift */,
 				C216CEDBDABA44E7C79BA32D /* OcclusionPollingPolicy.swift */,
 				361707A935A075251B5BC8F0 /* OptimizationPlanner.swift */,
+				716D925B876774FCFB65EEBB /* StatusSummary.swift */,
 			);
 			name = Policies;
 			sourceTree = "<group>";
@@ -672,6 +675,7 @@
 				12B57431A38C0592C694ECE7 /* OptimizationPlanner.swift in Sources */,
 				64DAD5F8EBB94F3B4E846398 /* AssetImportPipeline.swift in Sources */,
 				2326612427393FFCD6C1A834 /* ThumbnailCache.swift in Sources */,
+				26A1928628CF3E56DA7CC006 /* StatusSummary.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -268,3 +268,82 @@ final class DiagnosticsSummaryTests: XCTestCase {
         XCTAssertFalse(text.contains("/tmp/"), "file paths never appear in the report")
     }
 }
+
+final class LocalizationTests: XCTestCase {
+    private func catalog() throws -> [String: [String: Any]] {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Wallpaper/Resources/Localizable.xcstrings")
+        let json = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any]
+        return try XCTUnwrap(json?["strings"] as? [String: [String: Any]])
+    }
+
+    private func values(of entry: [String: Any], language: String) -> [String] {
+        guard let localization = (entry["localizations"] as? [String: Any])?[language] as? [String: Any] else { return [] }
+        if let unit = localization["stringUnit"] as? [String: Any], let value = unit["value"] as? String {
+            return [value]
+        }
+        let plural = (localization["variations"] as? [String: Any])?["plural"] as? [String: [String: Any]] ?? [:]
+        return plural.values.compactMap { ($0["stringUnit"] as? [String: Any])?["value"] as? String }
+    }
+
+    func testEveryStringHasEnglishAndBrazilianPortuguese() throws {
+        let strings = try catalog()
+        XCTAssertGreaterThan(strings.count, 100)
+        for (key, entry) in strings {
+            XCTAssertFalse(values(of: entry, language: "en").isEmpty, "missing English: \(key)")
+            XCTAssertFalse(values(of: entry, language: "pt-BR").isEmpty, "missing Portuguese: \(key)")
+        }
+    }
+
+    func testPortugueseIsAccentedAndNeverMentionsMVP() throws {
+        let portuguese = try catalog().values.flatMap { values(of: $0, language: "pt-BR") }
+        let unaccented = ["Nao ", " nao ", "cao ", "coes ", "video", "Inicializacao", "sessao", "Preferencias", "ocluido"]
+        for text in portuguese {
+            XCTAssertFalse(text.localizedCaseInsensitiveContains("MVP"), text)
+            for fragment in unaccented {
+                XCTAssertFalse((text + " ").contains(fragment), "unaccented “\(fragment)” in: \(text)")
+            }
+        }
+    }
+
+    func testFormatSpecifiersMatchBetweenLanguages() throws {
+        func specifiers(_ text: String) -> [String] {
+            let regex = try! NSRegularExpression(pattern: "%(?:\\d+\\$)?(lld|@)")
+            return regex.matches(in: text, range: NSRange(text.startIndex..., in: text))
+                .map { (text as NSString).substring(with: $0.range(at: 1)) }.sorted()
+        }
+        for (key, entry) in try catalog() {
+            for text in values(of: entry, language: "pt-BR") {
+                XCTAssertEqual(specifiers(text), specifiers(key), "specifier mismatch for: \(key)")
+            }
+        }
+    }
+}
+
+final class StatusSummaryTests: XCTestCase {
+    private func session(_ mode: RenderSession.EnergyMode, _ state: RenderSession.PlaybackState, _ reason: SessionModeReason = .none) -> RenderSession {
+        var session = RenderSession(
+            id: UUID(), displayTarget: Fixture.display(), assetID: UUID(), windowState: .visible,
+            playbackState: state, energyMode: mode, startedAt: .now, lastVisibilityChange: .now
+        )
+        session.modeReason = reason
+        return session
+    }
+
+    func testSummaries() {
+        XCTAssertEqual(StatusSummary.make(sessions: [], isUserPaused: false), .noWallpapers)
+        XCTAssertEqual(StatusSummary.make(sessions: [session(.poster, .poster, .userPaused)], isUserPaused: true), .pausedByUser)
+        XCTAssertEqual(
+            StatusSummary.make(sessions: [session(.animate, .animating), session(.suspend, .paused, .occluded)], isUserPaused: false),
+            .animating(count: 1, total: 2)
+        )
+        XCTAssertEqual(
+            StatusSummary.make(
+                sessions: [session(.suspend, .paused, .screenLocked), session(.suspend, .paused, .screenLocked), session(.poster, .poster, .battery)],
+                isUserPaused: false
+            ),
+            .idle(reason: .screenLocked)
+        )
+    }
+}

@@ -6,29 +6,27 @@ struct StartupSettingsView: View {
     var body: some View {
         WallpaperPageScrollView {
             WallpaperPageHeader(
-                "Inicializacao",
-                subtitle: "Controle o login item do macOS e acompanhe o estado atual de ativacao."
+                String(localized: "Startup"),
+                subtitle: String(localized: "Open WallSync automatically when you log in to your Mac.")
             )
 
             WallpaperSectionCard(
-                "Abertura automatica",
-                subtitle: "Quando ativado, o app inicia junto com sua sessao de usuario."
+                String(localized: "Open at login"),
+                subtitle: String(localized: "When on, WallSync starts together with your user session.")
             ) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Toggle(
-                        "Abrir ao iniciar sessao",
-                        isOn: Binding(
-                            get: { coordinator.preferences.launchAtLogin },
-                            set: { coordinator.updateLaunchAtLogin($0) }
-                        )
+                Toggle(
+                    "Open WallSync at login",
+                    isOn: Binding(
+                        get: { coordinator.preferences.launchAtLogin },
+                        set: { coordinator.updateLaunchAtLogin($0) }
                     )
-                }
+                )
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             WallpaperSectionCard(
-                "Estado atual",
-                subtitle: "Esse status reflete o retorno mais recente do sistema para o login item."
+                String(localized: "Current status"),
+                subtitle: String(localized: "What macOS last reported for the login item.")
             ) {
                 LabeledContent("Status") {
                     WallpaperStatusPill(label: statusLabel, color: statusColor)
@@ -40,11 +38,11 @@ struct StartupSettingsView: View {
     private var statusLabel: String {
         switch coordinator.startupLoginState {
         case .enabled:
-            return "Ativado"
+            return String(localized: "On")
         case .disabled:
-            return "Desativado"
+            return String(localized: "Off")
         case .requiresApproval:
-            return "Aguardando aprovacao do sistema"
+            return String(localized: "Waiting for approval in System Settings")
         }
     }
 

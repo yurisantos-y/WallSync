@@ -6,8 +6,8 @@ struct DisplaysView: View {
     var body: some View {
         WallpaperPageScrollView {
             WallpaperPageHeader(
-                "Displays",
-                subtitle: "Cada monitor recebe uma janela dedicada em nivel de desktop. Defina um wallpaper global, aplique overrides locais e acompanhe o estado de runtime por display."
+                String(localized: "Displays"),
+                subtitle: String(localized: "Choose one wallpaper for every display, or a different one for each, and see what each display is doing.")
             )
 
             globalAssignmentCard
@@ -15,9 +15,9 @@ struct DisplaysView: View {
             if coordinator.runtimeState.activeDisplays.isEmpty {
                 WallpaperGlassCard {
                     ContentUnavailableView(
-                        "Nenhum display encontrado",
+                        "No display found",
                         systemImage: "display",
-                        description: Text("Conecte um monitor ou aguarde a topologia do sistema estabilizar.")
+                        description: Text("Connect a display, or wait a moment for the system to finish detecting it.")
                     )
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 30)
@@ -34,32 +34,32 @@ struct DisplaysView: View {
 
     private var globalAssignmentCard: some View {
         WallpaperSectionCard(
-            "Padrao global",
-            subtitle: "O wallpaper global entra como fallback automatico quando um monitor nao tem atribuicao especifica."
+            String(localized: "All displays"),
+            subtitle: String(localized: "Used on every display that has no wallpaper of its own.")
         ) {
             HStack(alignment: .top) {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 8) {
                     WallpaperStatusPill(
-                        label: "\(coordinator.runtimeState.activeDisplays.count) displays",
+                        label: String(localized: "\(coordinator.runtimeState.activeDisplays.count) displays"),
                         color: .blue
                     )
                     WallpaperStatusPill(
-                        label: "\(coordinator.activeSessions.count) sessoes",
+                        label: String(localized: "\(coordinator.activeSessions.count) wallpapers running"),
                         color: .green
                     )
                 }
             }
 
             Picker(
-                "Wallpaper global",
+                "Wallpaper for all displays",
                 selection: Binding<UUID?>(
                     get: { coordinator.globalAssetID() },
                     set: { coordinator.setGlobalAsset($0) }
                 )
             ) {
-                Text("Sem wallpaper global").tag(Optional<UUID>.none)
+                Text("None").tag(Optional<UUID>.none)
                 ForEach(coordinator.assets) { asset in
                     Text(asset.displayName).tag(Optional(asset.id))
                 }
@@ -68,38 +68,25 @@ struct DisplaysView: View {
 
             HStack(spacing: 10) {
                 WallpaperStatusPill(
-                    label: coordinator.runtimeState.powerSource == .battery ? "Bateria" : "Tomada",
+                    label: coordinator.runtimeState.powerSource.localizedLabel,
                     color: coordinator.runtimeState.powerSource == .battery ? .orange : .green
                 )
                 WallpaperStatusPill(
-                    label: "Thermal \(coordinator.runtimeState.thermalState.displayLabel)",
+                    label: String(localized: "Temperature: \(coordinator.runtimeState.thermalState.localizedLabel)"),
                     color: coordinator.runtimeState.thermalState == .nominal ? .green : .orange
                 )
 
+                if coordinator.runtimeState.isUserPaused {
+                    WallpaperStatusPill(label: String(localized: "Paused by you"), color: .orange)
+                }
+
                 if !coordinator.runtimeState.fullscreenDisplayUUIDs.isEmpty {
                     WallpaperStatusPill(
-                        label: "\(coordinator.runtimeState.fullscreenDisplayUUIDs.count) fullscreen",
+                        label: String(localized: "\(coordinator.runtimeState.fullscreenDisplayUUIDs.count) in fullscreen"),
                         color: .orange
                     )
                 }
             }
-        }
-    }
-}
-
-private extension ProcessInfo.ThermalState {
-    var displayLabel: String {
-        switch self {
-        case .nominal:
-            return "Nominal"
-        case .fair:
-            return "Fair"
-        case .serious:
-            return "Serious"
-        case .critical:
-            return "Critical"
-        @unknown default:
-            return "Unknown"
         }
     }
 }

@@ -95,3 +95,22 @@ extension ProcessInfo.ThermalState {
         }
     }
 }
+
+extension StatusSummary {
+    var localizedLabel: String {
+        switch self {
+        case .noWallpapers:
+            return String(localized: "No wallpaper running")
+        case .pausedByUser:
+            return String(localized: "Paused")
+        case let .animating(count, total):
+            return count == total
+                ? String(localized: "Animating on \(count) displays")
+                : String(localized: "Animating on \(count) of \(total) displays")
+        case let .idle(reason):
+            return reason == .none
+                ? String(localized: "Not animating")
+                : String(localized: "Not animating: \(reason.localizedLabel)")
+        }
+    }
+}

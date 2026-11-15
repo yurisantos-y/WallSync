@@ -14,6 +14,17 @@ struct SettingsView: View {
                 WallpaperWindowBackground()
                 detailView(for: selection)
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if let message = coordinator.lastErrorMessage {
+                    ErrorBanner(message: message) {
+                        coordinator.dismissError()
+                    }
+                    .padding(.horizontal, 32)
+                    .padding(.top, 14)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
+            .animation(.easeOut(duration: 0.2), value: coordinator.lastErrorMessage)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .navigationSplitViewStyle(.balanced)
@@ -68,15 +79,15 @@ enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
     var title: String {
         switch self {
         case .library:
-            return "Biblioteca"
+            return String(localized: "Library")
         case .displays:
-            return "Displays"
+            return String(localized: "Displays")
         case .general:
-            return "Geral"
+            return String(localized: "General")
         case .energy:
-            return "Energia"
+            return String(localized: "Energy")
         case .startup:
-            return "Inicializacao"
+            return String(localized: "Startup")
         case .diagnostics:
             return String(localized: "Diagnostics")
         }
@@ -85,15 +96,15 @@ enum SettingsDestination: String, CaseIterable, Hashable, Identifiable {
     var subtitle: String {
         switch self {
         case .library:
-            return "Gerencie seus videos e escolha o wallpaper global."
+            return String(localized: "Your videos and the wallpaper for all displays.")
         case .displays:
-            return "Ajuste atribuicoes, fallback e runtime por monitor."
+            return String(localized: "A wallpaper for each display.")
         case .general:
-            return "Preferencias do app e operacao local."
+            return String(localized: "App behavior and playback quality.")
         case .energy:
-            return "Politicas de bateria, oclusao e fullscreen."
+            return String(localized: "Battery, covered desktop and fullscreen.")
         case .startup:
-            return "Controle abertura automatica e login item."
+            return String(localized: "Open at login.")
         case .diagnostics:
             return String(localized: "Live state of every display.")
         }
@@ -135,9 +146,9 @@ enum SidebarGroup: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .workspace:
-            return "Workspace"
+            return String(localized: "Wallpapers")
         case .preferences:
-            return "Preferencias"
+            return String(localized: "Settings")
         }
     }
 
@@ -158,11 +169,12 @@ struct WallpaperSidebar: View {
                     .interpolation(.high)
                     .frame(width: 44, height: 44)
                     .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 6)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("WallSync")
                         .font(.title2.weight(.semibold))
-                    Text("Um painel mais nativo do macOS para biblioteca, displays e energia.")
+                    Text("Animated wallpapers, in sync on every display.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -183,6 +195,9 @@ struct WallpaperSidebar: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                            .accessibilityLabel(Text(destination.title))
+                            .accessibilityHint(Text(destination.subtitle))
+                            .accessibilityAddTraits(selection == destination ? .isSelected : [])
                             .listRowInsets(EdgeInsets(top: 2, leading: 10, bottom: 2, trailing: 10))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
@@ -482,5 +497,38 @@ struct WallpaperStatusPill: View {
                     .stroke(color.opacity(colorScheme == .dark ? 0.28 : 0.18), lineWidth: 0.8)
             }
             .foregroundStyle(color)
+    }
+}
+
+/// Shows the latest error on every page until the user dismisses it.
+struct ErrorBanner: View {
+    let message: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        WallpaperGlassCard(padding: 14, cornerRadius: 18) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                    .accessibilityHidden(true)
+
+                Text(message)
+                    .font(.subheadline.weight(.medium))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    onDismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text("Dismiss"))
+                .help(Text("Dismiss"))
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text("Error"))
     }
 }
