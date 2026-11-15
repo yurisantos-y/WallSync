@@ -1,6 +1,22 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@, in use": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, in use"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, em uso"
+          }
+        }
+      }
+    },
     "%lld displays": {
       "localizations": {
         "en": {
@@ -1313,6 +1329,22 @@
         }
       }
     },
+    "Next wallpaper": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next wallpaper"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Próximo wallpaper"
+          }
+        }
+      }
+    },
     "No active session": {
       "localizations": {
         "en": {
@@ -1953,6 +1985,22 @@
         }
       }
     },
+    "Playlist: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlist: %@"
+          }
+        }
+      }
+    },
     "Plays without sound": {
       "localizations": {
         "en": {
@@ -2077,6 +2125,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Motivo"
+          }
+        }
+      }
+    },
+    "Recent wallpapers": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recent wallpapers"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wallpapers recentes"
           }
         }
       }

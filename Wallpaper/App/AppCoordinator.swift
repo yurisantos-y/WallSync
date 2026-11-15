@@ -154,6 +154,12 @@ final class AppCoordinator {
                 hasWallpapers: !self.activeSessions.isEmpty
             )
         }
+        self.statusItemController.menuContentProvider = { [weak self] in
+            self?.menuContent() ?? StatusItemController.MenuContent()
+        }
+        self.statusItemController.onApplyWallpaper = { [weak self] assetID, displayUUID in
+            self?.applyWallpaper(assetID, toDisplayUUID: displayUUID)
+        }
         self.statusItemController.onQuit = {
             NSApp.terminate(nil)
         }
@@ -525,7 +531,53 @@ final class AppCoordinator {
         }
     }
 
+    /// What the menu bar shows while it is open.
+    private func menuContent() -> StatusItemController.MenuContent {
+        let active = Set(resolution.displays.map(\.assetID))
+        let assetsByID = Dictionary(assets.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var content = StatusItemController.MenuContent()
+        content.recents = RecentWallpapers.items(assets: assets, activeAssetIDs: active).map { item in
+            StatusItemController.RecentEntry(
+                assetID: item.assetID,
+                name: item.name,
+                isActive: item.isActive,
+                thumbnailURL: assetsByID[item.assetID].flatMap(thumbnailURL(for:))
+            )
+        }
+        content.displays = runtimeState.activeDisplays.map { ($0.displayUUID, $0.localizedName) }
+        return content
+    }
+
+    /// Puts a wallpaper on one display, or on every display when
+    /// `displayUUID` is `nil` (per-display choices are then cleared, so that
+    /// "all displays" means all of them).
+    func applyWallpaper(_ assetID: UUID, toDisplayUUID displayUUID: String?) {
+        guard assets.contains(where: { $0.id == assetID }) else { return }
+
+        if let displayUUID {
+            if let display = runtimeState.activeDisplays.first(where: { $0.displayUUID == displayUUID }) {
+                assignAsset(assetID, to: display)
+            }
+            return
+        }
+
+        updatePlacements { placements in
+            placements.removeAll { !$0.isGlobal }
+        }
+        setGlobalAsset(assetID)
+    }
+
+    /// Records that a wallpaper was just put on a display.
+    private func markUsed(_ assetID: UUID?) {
+        guard let assetID, let index = assets.firstIndex(where: { $0.id == assetID }) else { return }
+        updateAssets { $0[index].lastUsedAt = .now }
+        Task {
+            try? await assetCatalogStore.saveAssets(assets)
+        }
+    }
+
     func setGlobalAsset(_ assetID: UUID?) {
+        markUsed(assetID)
         updatePlacements { placements in
             guard let assetID else {
                 placements.removeAll {
@@ -544,6 +596,8 @@ final class AppCoordinator {
                 return false
             }) {
                 placements[existingIndex].assetID = assetID
+                // Choosing a fixed wallpaper ends a playlist on this slot.
+                placements[existingIndex].playlistID = nil
             } else {
                 placements.append(WallpaperPlacement(assetID: assetID, scope: .allDisplays))
             }
@@ -644,6 +698,7 @@ final class AppCoordinator {
     }
 
     func assignAsset(_ assetID: UUID?, to display: DisplayTarget) {
+        markUsed(assetID)
         updatePlacements { placements in
             if let existingIndex = placements.firstIndex(where: {
                 if case let .specificDisplay(displayUUID) = $0.scope {
@@ -653,6 +708,7 @@ final class AppCoordinator {
             }) {
                 if let assetID {
                     placements[existingIndex].assetID = assetID
+                    placements[existingIndex].playlistID = nil
                 } else {
                     placements.remove(at: existingIndex)
                 }
