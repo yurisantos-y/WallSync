@@ -165,6 +165,7 @@ final class FakeEngine: SharedPlaybackEngine {
     private(set) var maximumPixelSizes: [CGSize?] = []
     private(set) var isPlaying = false
     private(set) var teardownCount = 0
+    private(set) var playbackRates: [Double] = []
     private(set) var attached: [ObjectIdentifier: Bool] = [:]
     var currentTime: TimeInterval = 0
     var onPlaybackFailure: (() -> Void)?
@@ -192,6 +193,7 @@ final class FakeEngine: SharedPlaybackEngine {
     func detach(_ surface: any WallpaperSurface) { attached[ObjectIdentifier(surface)] = nil }
     func setLive(_ isLive: Bool, for surface: any WallpaperSurface) { attached[ObjectIdentifier(surface)] = isLive }
     func setPlaying(_ isPlaying: Bool) { self.isPlaying = isPlaying }
+    func setPlaybackRate(_ rate: Double) { playbackRates.append(rate) }
     func snapshotCurrentFrame() async -> CGImage? { nil }
 
     func teardown() {

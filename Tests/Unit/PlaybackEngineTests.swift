@@ -218,4 +218,75 @@ final class PlaybackEngineTests: XCTestCase {
             XCTAssertTrue(engine.loadedAsset === loaded)
         }
     }
+
+    // MARK: - Playback speed
+
+    func testDisplayLinkWakesAtTheEffectiveFrameRate() async throws {
+        let clip = try await makeClip() // 30 fps
+        let engine = AVPlayerPlaybackEngine()
+        let surfaces = [HostingSurface("a"), HostingSurface("b")]
+
+        try await engine.prepare(url: clip, maximumPixelSize: nil, startTime: 0)
+        defer { engine.teardown() }
+        surfaces.forEach(engine.attach)
+        engine.setPlaying(true)
+
+        XCTAssertEqual(engine.displayLinkFrameRate, 30, "full speed wakes once per video frame")
+
+        engine.setPlaybackRate(0.5)
+        XCTAssertEqual(engine.effectiveFrameRate, 15, accuracy: 0.01)
+        XCTAssertEqual(engine.displayLinkFrameRate, 15, "half speed halves the wake-ups")
+
+        engine.setPlaybackRate(0.25)
+        XCTAssertEqual(engine.displayLinkFrameRate, 8, "7.5 frames per second, rounded up")
+
+        engine.setPlaybackRate(4)
+        XCTAssertEqual(engine.displayLinkFrameRate, 30, "speeds above 1x are not available")
+
+        engine.setPlaying(false)
+        XCTAssertNil(engine.displayLinkFrameRate, "no wake-ups at all while paused")
+    }
+
+    func testHalfSpeedDecodesHalfTheFrames() async throws {
+        let clip = try await makeClip()
+
+        func framesPresented(rate: Double) async throws -> Int {
+            let engine = AVPlayerPlaybackEngine()
+            let surfaces = [HostingSurface("a"), HostingSurface("b")]
+            engine.setPlaybackRate(rate)
+            try await engine.prepare(url: clip, maximumPixelSize: nil, startTime: 0)
+            defer { engine.teardown() }
+            surfaces.forEach(engine.attach)
+            engine.setPlaying(true)
+            try await pump(engine) { engine.presentedFrameCount > 0 }
+            let start = engine.presentedFrameCount
+            try await pump(engine, for: .seconds(2))
+            return engine.presentedFrameCount - start
+        }
+
+        let full = try await framesPresented(rate: 1)
+        let half = try await framesPresented(rate: 0.5)
+        XCTAssertGreaterThan(full, 30)
+        let ratio = Double(half) / Double(full)
+        XCTAssertEqual(ratio, 0.5, accuracy: 0.15, "full=\(full) half=\(half)")
+    }
+
+    func testSpeedSurvivesPauseAndResume() async throws {
+        let clip = try await makeClip()
+        let engine = AVPlayerPlaybackEngine()
+        let surface = HostingSurface("a")
+        engine.setPlaybackRate(0.5)
+        try await engine.prepare(url: clip, maximumPixelSize: nil, startTime: 0)
+        defer { engine.teardown() }
+        engine.attach(surface)
+
+        engine.setPlaying(true)
+        XCTAssertEqual(surface.hostView.playerLayer.player?.rate, 0.5)
+        engine.setPlaying(false)
+        XCTAssertEqual(surface.hostView.playerLayer.player?.rate, 0)
+        engine.setPlaying(true)
+        XCTAssertEqual(surface.hostView.playerLayer.player?.rate, 0.5)
+        engine.setPlaybackRate(1)
+        XCTAssertEqual(surface.hostView.playerLayer.player?.rate, 1, "the change is immediate")
+    }
 }

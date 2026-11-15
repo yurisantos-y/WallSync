@@ -31,6 +31,14 @@ import VideoToolbox
 /// (c) Several `AVPlayerLayer`s on one player: only one of them is
 /// guaranteed to display.
 ///
+/// *Speed.* Slow motion is the player's own rate, so the looper and the
+/// single decoder are untouched and the displays stay frame-identical. The
+/// decoder then produces `frame rate × speed` frames per second, and the
+/// display link of the shared-frame path wakes at that same effective rate:
+/// at 0.5× both the decoded frames and the wake-ups are halved. Speeds above
+/// 1× are not offered because they would raise the decode work above the
+/// frame-rate ceiling the user chose.
+///
 /// *No audio.* The player item is a composition containing only the video
 /// track, so audio is never decoded, for optimized renditions and original
 /// files alike.
@@ -50,6 +58,7 @@ final class AVPlayerPlaybackEngine: SharedPlaybackEngine {
     private var looper: AVPlayerLooper?
     private var loopDuration: CMTime = .zero
     private var nominalFrameRate: Float = 30
+    private var playbackRate: Float = 1
     private var colorDescription = VideoColorDescription.sdr
     private var preparationID = 0
 
@@ -62,6 +71,8 @@ final class AVPlayerPlaybackEngine: SharedPlaybackEngine {
     private var lastPixelBuffer: CVPixelBuffer?
     private var displayLink: CADisplayLink?
     private var displayLinkSinkID: ObjectIdentifier?
+    /// Wake-ups per second the display link was created with.
+    private(set) var displayLinkFrameRate: Float?
     private let displayLinkTarget = DisplayLinkTarget()
 
     private var wantsPlaying = false
@@ -131,6 +142,7 @@ final class AVPlayerPlaybackEngine: SharedPlaybackEngine {
         newPlayer.automaticallyWaitsToMinimizeStalling = false
         newPlayer.preventsDisplaySleepDuringVideoPlayback = false
         newPlayer.actionAtItemEnd = .advance
+        newPlayer.defaultRate = playbackRate
 
         let newLooper = AVPlayerLooper(player: newPlayer, templateItem: item)
         try await Self.waitUntilReady(newLooper)
@@ -242,6 +254,24 @@ final class AVPlayerPlaybackEngine: SharedPlaybackEngine {
         applyPlayState()
     }
 
+    func setPlaybackRate(_ rate: Double) {
+        let range = WallpaperAsset.playbackRateRange
+        let clamped = Float(min(max(rate.isFinite ? rate : 1, range.lowerBound), range.upperBound))
+        guard clamped != playbackRate else { return }
+        playbackRate = clamped
+        player?.defaultRate = clamped
+        if wantsPlaying, let player, player.rate != 0 {
+            player.rate = clamped
+        }
+        updateDisplayLink()
+    }
+
+    /// Frames decoded per second while playing: the video's frame rate
+    /// scaled by the playback speed.
+    var effectiveFrameRate: Float {
+        nominalFrameRate * playbackRate
+    }
+
     /// Chooses between the direct `AVPlayerLayer` path (one display) and the
     /// shared-frame path (several displays).
     private func configurePresentation() {
@@ -271,7 +301,7 @@ final class AVPlayerPlaybackEngine: SharedPlaybackEngine {
         guard let player else { return }
 
         if wantsPlaying {
-            player.playImmediately(atRate: 1.0)
+            player.playImmediately(atRate: playbackRate)
             if decodingSignpost == nil {
                 decodingSignpost = Signpost.begin(Signpost.Name.decoding)
             }
@@ -368,25 +398,29 @@ final class AVPlayerPlaybackEngine: SharedPlaybackEngine {
 
         // The link belongs to a display that is actually showing video; a
         // link tied to a hidden window would be suspended by the system.
-        guard displayLinkSinkID != liveSinkID || displayLink == nil else { return }
+        // Wake at the rate frames are produced (frame rate × speed), not at
+        // the display's refresh rate: any wake-up beyond that finds no new
+        // frame and is wasted.
+        let rate = max(1, effectiveFrameRate.rounded(.up))
+        guard displayLinkSinkID != liveSinkID || displayLink == nil || displayLinkFrameRate != rate else { return }
         stopDisplayLink()
 
         let link = sink.host.hostView.displayLink(
             target: displayLinkTarget,
             selector: #selector(DisplayLinkTarget.tick(_:))
         )
-        // Wake at the video's frame rate, not at the display's refresh rate.
-        let rate = max(1, nominalFrameRate.rounded(.up))
         link.preferredFrameRateRange = CAFrameRateRange(minimum: rate, maximum: rate, preferred: rate)
         link.add(to: .main, forMode: .common)
         displayLink = link
         displayLinkSinkID = liveSinkID
+        displayLinkFrameRate = rate
     }
 
     private func stopDisplayLink() {
         displayLink?.invalidate()
         displayLink = nil
         displayLinkSinkID = nil
+        displayLinkFrameRate = nil
     }
 
     // MARK: - Snapshot

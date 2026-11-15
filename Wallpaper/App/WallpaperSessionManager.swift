@@ -55,6 +55,7 @@ final class WallpaperSessionManager {
         var optimizedUnavailable = false
         var prepareFailed = false
         var resumeTime: TimeInterval = 0
+        var playbackRate: Double = 1
         var unloadTask: Task<Void, Never>?
         var unloadToken = 0
 
@@ -366,6 +367,10 @@ final class WallpaperSessionManager {
 
             let renditionChanged = group.asset.optimizedPlayback != first.asset.optimizedPlayback
             group.asset = first.asset
+            if group.playbackRate != first.asset.effectivePlaybackRate {
+                group.playbackRate = first.asset.effectivePlaybackRate
+                group.engine.setPlaybackRate(group.playbackRate)
+            }
             if renditionChanged {
                 group.optimizedUnavailable = false
                 group.prepareFailed = false

@@ -1361,6 +1361,22 @@
         }
       }
     },
+    "Normal speed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Normal speed"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velocidade normal"
+          }
+        }
+      }
+    },
     "Not animating": {
       "localizations": {
         "en": {
@@ -1757,6 +1773,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pausado"
+          }
+        }
+      }
+    },
+    "Paused by a Focus": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused by a Focus"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pausado por um Foco"
           }
         }
       }
@@ -2177,6 +2209,22 @@
         }
       }
     },
+    "Slower playback is calmer and uses less energy: fewer frames are decoded each second.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slower playback is calmer and uses less energy: fewer frames are decoded each second."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reproduzir mais devagar deixa a cena mais calma e gasta menos energia: menos quadros são decodificados por segundo."
+          }
+        }
+      }
+    },
     "Smoothness (up to 60 fps)": {
       "localizations": {
         "en": {
@@ -2189,6 +2237,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fluidez (até 60 fps)"
+          }
+        }
+      }
+    },
+    "Speed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speed"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velocidade"
+          }
+        }
+      }
+    },
+    "Speed of %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Speed of %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Velocidade de %@"
           }
         }
       }

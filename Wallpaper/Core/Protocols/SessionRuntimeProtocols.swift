@@ -38,8 +38,14 @@ protocol SharedPlaybackEngine: AnyObject {
     /// A surface that is not live keeps showing its last frame.
     func setLive(_ isLive: Bool, for surface: any WallpaperSurface)
     func setPlaying(_ isPlaying: Bool)
+    /// 0.25 … 1. Takes effect at once and needs no new rendition.
+    func setPlaybackRate(_ rate: Double)
     func snapshotCurrentFrame() async -> CGImage?
     func teardown()
+}
+
+extension SharedPlaybackEngine {
+    func setPlaybackRate(_ rate: Double) {}
 }
 
 /// Everything the session manager needs from the outside world; replaced by

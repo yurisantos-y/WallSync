@@ -605,6 +605,16 @@ final class AppCoordinator {
         (asset.thumbnailRelativePath ?? asset.posterImageRelativePath).map(storage.url(forRelativePath:))
     }
 
+    /// Changes how fast one wallpaper plays. Immediate: no new rendition.
+    func updatePlaybackRate(_ rate: Double, for assetID: UUID) {
+        guard let index = assets.firstIndex(where: { $0.id == assetID }) else { return }
+        let range = WallpaperAsset.playbackRateRange
+        let clamped = min(max(rate, range.lowerBound), range.upperBound)
+        guard assets[index].playbackRate != clamped else { return }
+        updateAssets { $0[index].playbackRate = clamped }
+        persistAssetsAndReconcile(reason: "playback_rate_changed")
+    }
+
     func updatePlaybackQuality(_ quality: UserPreferences.PlaybackQuality) {
         updatePreferences {
             $0.playbackQuality = quality
@@ -859,6 +869,17 @@ final class AppCoordinator {
             do {
                 try await settingsStore.savePreferences(preferences)
                 scheduleReconcile(trigger: .manual, reason: reason)
+            } catch {
+                present(error)
+            }
+        }
+    }
+
+    private func persistAssetsAndReconcile(reason: String) {
+        Task {
+            do {
+                try await assetCatalogStore.saveAssets(assets)
+                await reconcileRespectingGate(reason: reason)
             } catch {
                 present(error)
             }

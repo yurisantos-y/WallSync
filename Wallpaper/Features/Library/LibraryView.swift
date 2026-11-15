@@ -130,6 +130,8 @@ struct LibraryView: View {
                         }
                     }
 
+                    assetAdjustments(for: asset)
+
                     HStack(spacing: 10) {
                         Button("Use on all displays") {
                             coordinator.setGlobalAsset(asset.id)
@@ -147,6 +149,38 @@ struct LibraryView: View {
             }
         }
         .accessibilityElement(children: .contain)
+    }
+}
+
+extension LibraryView {
+    static let playbackRates: [Double] = [0.25, 0.5, 0.75, 1]
+
+    static func rateLabel(_ rate: Double) -> String {
+        rate == 1
+            ? String(localized: "Normal speed")
+            : "\(rate.formatted(.number.precision(.fractionLength(0...2))))×"
+    }
+
+    /// Per-wallpaper settings that take effect without a new rendition.
+    @ViewBuilder
+    fileprivate func assetAdjustments(for asset: WallpaperAsset) -> some View {
+        HStack(spacing: 14) {
+            Picker(
+                "Speed",
+                selection: Binding(
+                    get: { asset.effectivePlaybackRate },
+                    set: { coordinator.updatePlaybackRate($0, for: asset.id) }
+                )
+            ) {
+                ForEach(Self.playbackRates, id: \.self) { rate in
+                    Text(Self.rateLabel(rate)).tag(rate)
+                }
+            }
+            .pickerStyle(.menu)
+            .fixedSize()
+            .help(Text("Slower playback is calmer and uses less energy: fewer frames are decoded each second."))
+            .accessibilityLabel(Text("Speed of \(asset.displayName)"))
+        }
     }
 }
 
