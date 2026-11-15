@@ -185,6 +185,22 @@
         }
       }
     },
+    "Adds extra dimming while macOS uses the dark appearance, and removes it in the light appearance.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adds extra dimming while macOS uses the dark appearance, and removes it in the light appearance."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Acrescenta escurecimento enquanto o macOS usa a aparência escura e o remove na aparência clara."
+          }
+        }
+      }
+    },
     "All displays": {
       "localizations": {
         "en": {
@@ -689,6 +705,22 @@
         }
       }
     },
+    "Darkens every wallpaper so icons and widgets stay easy to read. Each wallpaper can have its own value in the library.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Darkens every wallpaper so icons and widgets stay easy to read. Each wallpaper can have its own value in the library."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escurece todos os wallpapers para que ícones e widgets fiquem fáceis de ler. Cada wallpaper pode ter um valor próprio na biblioteca."
+          }
+        }
+      }
+    },
     "Decoded stream": {
       "localizations": {
         "en": {
@@ -733,6 +765,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "Diagnóstico"
+          }
+        }
+      }
+    },
+    "Dim more in dark mode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dim more in dark mode"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escurecer mais no modo escuro"
+          }
+        }
+      }
+    },
+    "Dimming": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimming"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escurecimento"
+          }
+        }
+      }
+    },
+    "Dimming of %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dimming of %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escurecimento de %@"
           }
         }
       }
@@ -2097,6 +2177,22 @@
         }
       }
     },
+    "Same as in Settings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Same as in Settings"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Igual aos Ajustes"
+          }
+        }
+      }
+    },
     "Scaling": {
       "localizations": {
         "en": {
@@ -2605,6 +2701,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Estado térmico"
+          }
+        }
+      }
+    },
+    "Tint color": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tint color"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cor da tinta"
+          }
+        }
+      }
+    },
+    "Tint with a color": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tint with a color"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tingir com uma cor"
           }
         }
       }

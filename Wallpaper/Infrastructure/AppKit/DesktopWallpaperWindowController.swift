@@ -57,6 +57,10 @@ final class DesktopWallpaperWindowController: NSWindowController, WallpaperSurfa
         hostView.setPoster(image)
     }
 
+    func setDimming(_ overlay: DimOverlay?) {
+        hostView.setDimming(overlay)
+    }
+
     func showPoster() {
         hostView.setVideoVisible(false)
     }

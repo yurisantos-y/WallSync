@@ -34,6 +34,7 @@ struct UserPreferences: Codable, Hashable, Sendable {
     var playbackQuality: PlaybackQuality = .efficiency
     /// Show a still frame while the system "Reduce motion" setting is on.
     var pauseWhenReduceMotion: Bool = false
+    var dimming: DimmingSettings = .off
 
     static let defaultValue = UserPreferences(
         launchAtLogin: false,
@@ -60,7 +61,8 @@ extension UserPreferences {
             pauseWhenOccluded: try container.decodeIfPresent(Bool.self, forKey: .pauseWhenOccluded) ?? defaults.pauseWhenOccluded,
             fallbackMode: (try? container.decodeIfPresent(FallbackMode.self, forKey: .fallbackMode)) ?? defaults.fallbackMode,
             playbackQuality: (try? container.decodeIfPresent(PlaybackQuality.self, forKey: .playbackQuality)) ?? defaults.playbackQuality,
-            pauseWhenReduceMotion: try container.decodeIfPresent(Bool.self, forKey: .pauseWhenReduceMotion) ?? defaults.pauseWhenReduceMotion
+            pauseWhenReduceMotion: try container.decodeIfPresent(Bool.self, forKey: .pauseWhenReduceMotion) ?? defaults.pauseWhenReduceMotion,
+            dimming: (try? container.decodeIfPresent(DimmingSettings.self, forKey: .dimming)) ?? defaults.dimming
         )
     }
 }

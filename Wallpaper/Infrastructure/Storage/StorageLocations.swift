@@ -6,6 +6,9 @@ import Foundation
 struct StorageLocations: Sendable, Equatable {
     static let optimizedDirectoryName = "OptimizedVideos"
     static let postersDirectoryName = "Posters"
+    /// Stills derived from posters (dimmed, or one display's slice of a
+    /// panorama) for the system desktop picture. Rebuilt on demand.
+    static let desktopPicturesDirectoryName = "DesktopPictures"
 
     let root: URL
 
@@ -14,6 +17,7 @@ struct StorageLocations: Sendable, Equatable {
     var bookmarksFile: URL { root.appendingPathComponent("bookmarks.json") }
     var optimizedDirectory: URL { root.appendingPathComponent(Self.optimizedDirectoryName, isDirectory: true) }
     var postersDirectory: URL { root.appendingPathComponent(Self.postersDirectoryName, isDirectory: true) }
+    var desktopPicturesDirectory: URL { root.appendingPathComponent(Self.desktopPicturesDirectoryName, isDirectory: true) }
 
     init(root: URL) {
         self.root = root
@@ -28,7 +32,7 @@ struct StorageLocations: Sendable, Equatable {
     }
 
     func prepareDirectories(fileManager: FileManager = .default) throws {
-        for directory in [root, optimizedDirectory, postersDirectory] {
+        for directory in [root, optimizedDirectory, postersDirectory, desktopPicturesDirectory] {
             try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         }
     }

@@ -11,11 +11,30 @@ import IOSurface
 ///    presented on several displays), or the frozen last frame.
 /// 3. `playerLayer` — direct `AVPlayerLayer` output, used when the video is
 ///    shown on a single display (the most efficient path).
+/// 4. `dimLayer` — only while dimming is configured: a solid colour with an
+///    opacity. With dimming off the layer is not in the tree at all, so the
+///    render path is exactly the one without the feature.
+///
+/// ## Why dimming is a layer and not baked into the video
+///
+/// Baking the dimming into the optimized rendition would cost nothing at
+/// playback, but every adjustment of the slider would be a re-encode and the
+/// automatic "dim more in dark mode" switch would be impossible. A solid
+/// layer costs the app nothing per frame — it is composited by the window
+/// server, which already blends the Dock, the menu bar, icons and widgets
+/// over the wallpaper window — and works unchanged for HDR: the blend scales
+/// the extended-range video instead of converting it to SDR.
+///
+/// The open question is whether one more blended layer moves the video off
+/// a cheaper presentation path inside the window server. That can only be
+/// answered with a power measurement on real hardware (scenario 9 in
+/// `Distribution/PERFORMANCE.md`); it has not been measured yet.
 final class WallpaperHostView: NSView {
     private let posterLayer = CALayer()
     private let videoContainer = CALayer()
     private let frameLayer = CALayer()
     let playerLayer = AVPlayerLayer()
+    private var dimLayer: CALayer?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -52,8 +71,43 @@ final class WallpaperHostView: NSView {
             videoContainer.frame = bounds
             frameLayer.frame = bounds
             playerLayer.frame = bounds
+            dimLayer?.frame = bounds
         }
     }
+
+    /// Adds, updates or removes the dimming layer.
+    func setDimming(_ overlay: DimOverlay?) {
+        withoutImplicitAnimations {
+            guard let overlay else {
+                dimLayer?.removeFromSuperlayer()
+                dimLayer = nil
+                return
+            }
+
+            let layer: CALayer
+            if let dimLayer {
+                layer = dimLayer
+            } else {
+                layer = CALayer()
+                configure(layer: layer)
+                layer.actions?["backgroundColor"] = NSNull()
+                layer.actions?["opacity"] = NSNull()
+                layer.frame = bounds
+                self.layer?.addSublayer(layer)
+                dimLayer = layer
+            }
+            layer.backgroundColor = CGColor(
+                srgbRed: overlay.color.red, green: overlay.color.green, blue: overlay.color.blue, alpha: 1
+            )
+            layer.opacity = Float(overlay.opacity)
+        }
+    }
+
+    /// Whether a dimming layer is in the tree; used by tests.
+    var hasDimmingLayer: Bool { dimLayer?.superlayer != nil }
+
+    /// Number of layers under the root; used by tests.
+    var rootSublayerCount: Int { layer?.sublayers?.count ?? 0 }
 
     func setContentMode(_ contentMode: WallpaperPlacement.ContentMode) {
         withoutImplicitAnimations {

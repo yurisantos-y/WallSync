@@ -81,6 +81,8 @@ checklist.
 | 6 | Display asleep | Let the display sleep (`pmset displaysleepnow`) | `reason=displaysAsleep`, `decoding stopped` |
 | 7 | Battery | Unplug the charger | `power_changed` reconcile in under a second; heavy assets switch to a still frame when "Reduce activity on battery" is on |
 | 8 | Sleep / wake | Close the lid, reopen | No window is destroyed; the wallpaper is on screen immediately after wake |
+| 9 | Dimming | Scenario 1, then scenario 2, each with Settings › General › Dimming at 0% and at 40% | App CPU unchanged (the dimming layer costs the app nothing per frame). Compare **WindowServer** CPU and GPU power between 0% and 40%: the difference decides whether dimming stays a layer or has to be baked into the rendition |
+| 10 | Half speed | Scenario 2 with the wallpaper's speed at 0.5× | Half the frame-distribution callbacks per second and roughly half the media-engine activity of scenario 2 |
 
 For scenario 2, check sync by filming two displays at 240 fps with a phone
 and stepping through the footage, or by using a clip with a visible frame
@@ -96,3 +98,23 @@ log stream --predicate 'subsystem == "com.yurisantos.wallpaper" && category == "
 Unplug the charger and compare the timestamp of `system event:
 powerStateChanged` with the following `energy` line. The debounce is 120 ms,
 so the mode change should land well under one second after the event.
+
+## Dimming: layer versus baked
+
+Dimming is a solid Core Animation layer above the video (see the header of
+`WallpaperHostView.swift` for the reasoning). The app does no per-frame work
+for it, but the window server blends one more layer, which could move the
+video off a cheaper presentation path. Measure it before every release that
+touches the layer tree:
+
+```bash
+sudo powermetrics --samplers tasks,gpu_power -i 5000 -n 12 | grep -E "WindowServer|WallSync|GPU Power"
+```
+
+Run it once with dimming at 0% and once at 40%, for scenario 1 (one display,
+direct `AVPlayerLayer`) and scenario 2 (several displays, shared IOSurface).
+If WindowServer or GPU power rises by more than measurement noise, the
+alternative is to bake the dimming into the optimized rendition, at the cost
+of a re-encode per adjustment and of the automatic dark-mode switch.
+
+This comparison has **not** been run yet: it needs real hardware and `sudo`.

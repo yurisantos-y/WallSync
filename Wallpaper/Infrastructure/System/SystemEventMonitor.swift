@@ -17,6 +17,15 @@ final class SystemEventMonitor {
         case displaySleepChanged(isAsleep: Bool)
         case sessionActiveChanged(isActive: Bool)
         case accessibilityOptionsChanged
+        /// The system switched between the light and dark appearance.
+        case appearanceChanged
+        /// The clock was set, or the time zone changed.
+        case clockChanged
+    }
+
+    /// Whether the system is using the dark appearance right now.
+    static var isDarkAppearance: Bool {
+        NSApp?.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
     }
 
     private var observers: [(center: NotificationCenter, token: NSObjectProtocol)] = []
@@ -72,6 +81,10 @@ final class SystemEventMonitor {
 
         observe(appCenter, NSNotification.Name.NSProcessInfoPowerStateDidChange, .powerStateChanged)
         observe(appCenter, ProcessInfo.thermalStateDidChangeNotification, .thermalStateChanged)
+
+        observe(distributedCenter, Notification.Name("AppleInterfaceThemeChangedNotification"), .appearanceChanged)
+        observe(appCenter, NSNotification.Name.NSSystemClockDidChange, .clockChanged)
+        observe(appCenter, NSNotification.Name.NSSystemTimeZoneDidChange, .clockChanged)
 
         observe(distributedCenter, Notification.Name("com.apple.screenIsLocked"), .screenLockChanged(isLocked: true))
         observe(distributedCenter, Notification.Name("com.apple.screenIsUnlocked"), .screenLockChanged(isLocked: false))

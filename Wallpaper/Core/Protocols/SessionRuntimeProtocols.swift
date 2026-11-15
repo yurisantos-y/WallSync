@@ -14,6 +14,8 @@ protocol WallpaperSurface: AnyObject {
     func update(displayTarget: DisplayTarget)
     func setContentMode(_ contentMode: WallpaperPlacement.ContentMode)
     func setPoster(_ image: CGImage?)
+    /// A colour laid over poster and video alike; `nil` removes it.
+    func setDimming(_ overlay: DimOverlay?)
     func showPoster()
     func showVideo()
     func show()
@@ -42,6 +44,10 @@ protocol SharedPlaybackEngine: AnyObject {
     func setPlaybackRate(_ rate: Double)
     func snapshotCurrentFrame() async -> CGImage?
     func teardown()
+}
+
+extension WallpaperSurface {
+    func setDimming(_ overlay: DimOverlay?) {}
 }
 
 extension SharedPlaybackEngine {

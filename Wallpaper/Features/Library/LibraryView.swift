@@ -154,6 +154,7 @@ struct LibraryView: View {
 
 extension LibraryView {
     static let playbackRates: [Double] = [0.25, 0.5, 0.75, 1]
+    static let dimmingSteps: [Double] = [0, 0.2, 0.4, 0.6, 0.8]
 
     static func rateLabel(_ rate: Double) -> String {
         rate == 1
@@ -180,6 +181,22 @@ extension LibraryView {
             .fixedSize()
             .help(Text("Slower playback is calmer and uses less energy: fewer frames are decoded each second."))
             .accessibilityLabel(Text("Speed of \(asset.displayName)"))
+
+            Picker(
+                "Dimming",
+                selection: Binding<Double?>(
+                    get: { asset.dimmingOverride.map { ($0 * 10).rounded() / 10 } },
+                    set: { coordinator.updateDimmingOverride($0, for: asset.id) }
+                )
+            ) {
+                Text("Same as in Settings").tag(Optional<Double>.none)
+                ForEach(Self.dimmingSteps, id: \.self) { amount in
+                    Text(amount.formatted(.percent.precision(.fractionLength(0)))).tag(Optional(amount))
+                }
+            }
+            .pickerStyle(.menu)
+            .fixedSize()
+            .accessibilityLabel(Text("Dimming of \(asset.displayName)"))
         }
     }
 }

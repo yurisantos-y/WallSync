@@ -615,6 +615,25 @@ final class AppCoordinator {
         persistAssetsAndReconcile(reason: "playback_rate_changed")
     }
 
+    /// Changes the global dimming. Takes effect at once: no new rendition.
+    func updateDimming(_ mutate: (inout DimmingSettings) -> Void) {
+        var dimming = preferences.dimming
+        mutate(&dimming)
+        dimming.amount = min(max(dimming.amount, 0), DimmingSettings.maximum)
+        guard dimming != preferences.dimming else { return }
+        updatePreferences { $0.dimming = dimming }
+        persistPreferencesAndReconcile(reason: "dimming_changed")
+    }
+
+    /// Per-wallpaper dimming; `nil` follows the global setting.
+    func updateDimmingOverride(_ amount: Double?, for assetID: UUID) {
+        guard let index = assets.firstIndex(where: { $0.id == assetID }) else { return }
+        let clamped = amount.map { min(max($0, 0), DimmingSettings.maximum) }
+        guard assets[index].dimmingOverride != clamped else { return }
+        updateAssets { $0[index].dimmingOverride = clamped }
+        persistAssetsAndReconcile(reason: "dimming_override_changed")
+    }
+
     func updatePlaybackQuality(_ quality: UserPreferences.PlaybackQuality) {
         updatePreferences {
             $0.playbackQuality = quality
@@ -792,6 +811,7 @@ final class AppCoordinator {
             $0.lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
             $0.thermalState = thermalMonitor.currentThermalState()
             $0.reduceMotionEnabled = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            $0.isDarkAppearance = SystemEventMonitor.isDarkAppearance
             // Safety net: if the "unlocked" notification was missed, the
             // session dictionary still tells the truth.
             if $0.isScreenLocked && !SystemEventMonitor.isScreenCurrentlyLocked {
@@ -933,6 +953,11 @@ final class AppCoordinator {
             reconcileImmediately(reason: isActive ? "session_active" : "session_inactive")
         case .accessibilityOptionsChanged:
             scheduleReconcile(trigger: .powerChange, reason: "accessibility_changed")
+        case .appearanceChanged:
+            // The short debounce also lets AppKit pick the new appearance up.
+            scheduleReconcile(trigger: .powerChange, reason: "appearance_changed")
+        case .clockChanged:
+            scheduleReconcile(trigger: .powerChange, reason: "clock_changed")
         case .displaysChanged:
             scheduleReconcile(trigger: .displayChange, reason: "display_changed")
         case .activeSpaceChanged:
@@ -1031,7 +1056,9 @@ final class AppCoordinator {
             try nativeDesktopPictureManager.syncDesktopPictures(
                 displays: runtimeState.activeDisplays,
                 assets: assets,
-                placements: resolution.placements
+                placements: resolution.placements,
+                dimming: preferences.dimming,
+                isDarkAppearance: runtimeState.isDarkAppearance
             )
         } catch {
             present(error)

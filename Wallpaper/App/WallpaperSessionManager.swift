@@ -33,6 +33,7 @@ final class WallpaperSessionManager {
         var isFullscreen = false
         var posterPath: String?
         var isAttached = false
+        var dimming: DimOverlay?
 
         init(session: RenderSession, asset: WallpaperAsset, placement: WallpaperPlacement, surface: any WallpaperSurface) {
             self.session = session
@@ -312,6 +313,19 @@ final class WallpaperSessionManager {
                     placement: item.placement,
                     surface: surface
                 )
+            }
+        }
+
+        // Dimming follows the asset, the preferences and the appearance.
+        for runtime in sessions.values {
+            let dimming = DimmingPolicy.overlay(
+                for: runtime.asset,
+                settings: request.preferences.dimming,
+                isDarkAppearance: request.runtimeState.isDarkAppearance
+            )
+            if dimming != runtime.dimming {
+                runtime.dimming = dimming
+                runtime.surface.setDimming(dimming)
             }
         }
 
