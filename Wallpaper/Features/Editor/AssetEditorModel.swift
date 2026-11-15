@@ -23,6 +23,20 @@ final class AssetEditorModel {
     var selectionEnd: TimeInterval
     var crossfade: TimeInterval
 
+    /// Areas covered by a logo, unit rectangles with a top-left origin.
+    var regions: [CGRect]
+    /// The visible part of the picture when the logo is cut off instead.
+    var crop: CGRect?
+    /// A frame of the original, to mark regions on.
+    private(set) var stillImage: CGImage?
+    private(set) var isAnalyzing = false
+    private(set) var analysisProgress = 0.0
+    private(set) var logoNote: String?
+    /// Before / after stills of the current regions.
+    private(set) var comparison: [WatermarkPreviewer.Pair] = []
+    private(set) var comparisonStrategies: [WatermarkStrategy] = []
+    @ObservationIgnored private var analysisTask: Task<Void, Never>?
+
     private(set) var isSuggesting = false
     private(set) var suggestionProgress = 0.0
     /// Result of the last "Suggest", shown under the button.
@@ -47,6 +61,8 @@ final class AssetEditorModel {
         selectionStart = recipe.trim?.start ?? 0
         selectionEnd = recipe.trim?.end ?? asset.duration
         crossfade = recipe.loopCrossfade
+        regions = recipe.watermarkRegions
+        crop = recipe.crop
         player.isMuted = true
         player.allowsExternalPlayback = false
         player.preventsDisplaySleepDuringVideoPlayback = false
@@ -58,6 +74,8 @@ final class AssetEditorModel {
         var recipe = asset.editRecipe
         recipe.trim = EditRecipe.Trim(start: selectionStart, end: selectionEnd)
         recipe.loopCrossfade = crossfade
+        recipe.watermarkRegions = regions
+        recipe.crop = crop
         return recipe.normalized(duration: duration)
     }
 
@@ -91,11 +109,24 @@ final class AssetEditorModel {
         }
         phase = .ready
         rebuildPreview(fromSeam: false)
+        await loadStillImage()
+    }
+
+    private func loadStillImage() async {
+        guard let sourceAsset else { return }
+        let generator = AVAssetImageGenerator(asset: sourceAsset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 1440, height: 1440)
+        let time = CMTime(seconds: (selectionStart + selectionEnd) / 2, preferredTimescale: 600)
+        stillImage = try? await generator.image(at: time).image
     }
 
     func close() {
         previewTask?.cancel()
         suggestTask?.cancel()
+        analysisTask?.cancel()
+        comparison = []
+        stillImage = nil
         looper?.disableLooping()
         looper = nil
         player.pause()
@@ -127,7 +158,112 @@ final class AssetEditorModel {
         crossfade = min(max(0, value), maximumCrossfade)
     }
 
+    // MARK: - Logo removal
+
+    /// Cutting the logo off instead of filling it in, when that costs
+    /// little of the picture.
+    var reframeOffer: WatermarkPlanner.Reframe? {
+        crop == nil ? WatermarkPlanner.reframe(excluding: regions) : nil
+    }
+
+    func addRegion(_ region: CGRect) {
+        let unit = CGRect(x: 0, y: 0, width: 1, height: 1)
+        let clipped = region.standardized.intersection(unit)
+        guard !clipped.isNull, clipped.width > 0.005, clipped.height > 0.005 else { return }
+        regions.append(clipped)
+        comparison = []
+    }
+
+    func removeRegion(at index: Int) {
+        guard regions.indices.contains(index) else { return }
+        regions.remove(at: index)
+        comparison = []
+    }
+
+    /// Reframes so the marked logos fall outside the picture; nothing is
+    /// left to fill in.
+    func acceptReframe() {
+        guard let offer = reframeOffer else { return }
+        crop = offer.crop
+        regions = []
+        comparison = []
+        logoNote = nil
+    }
+
+    func clearReframe() {
+        crop = nil
+        comparison = []
+    }
+
+    func detectLogos() {
+        guard phase == .ready, let sourceURL, !isAnalyzing else { return }
+        isAnalyzing = true
+        analysisProgress = 0
+        logoNote = nil
+
+        analysisTask = Task { [weak self] in
+            let found = try? await Task.detached(priority: .userInitiated) {
+                try await WatermarkPreviewer.detect(url: sourceURL) { fraction in
+                    Task { @MainActor in self?.analysisProgress = fraction }
+                }
+            }.value
+
+            guard let self else { return }
+            self.isAnalyzing = false
+            guard !Task.isCancelled else { return }
+            if let found, !found.isEmpty {
+                self.regions = found
+                self.comparison = []
+                self.logoNote = String(localized: "Check the suggested areas, and adjust or remove them if needed.")
+            } else {
+                self.logoNote = String(localized: "No fixed logo was found. Draw a rectangle over it.")
+            }
+        }
+    }
+
+    /// Renders before / after stills at three moments of the selection.
+    func compare() {
+        guard phase == .ready, let sourceURL, !isAnalyzing, !regions.isEmpty else { return }
+        isAnalyzing = true
+        analysisProgress = 0
+        let regions = regions, crop = crop
+        let span = selectionEnd - selectionStart
+        let times = [0.2, 0.5, 0.8].map { selectionStart + span * $0 }
+
+        analysisTask = Task { [weak self] in
+            let result = try? await Task.detached(priority: .userInitiated) {
+                try await WatermarkPreviewer.render(url: sourceURL, regions: regions, crop: crop, times: times) { fraction in
+                    Task { @MainActor in self?.analysisProgress = fraction }
+                }
+            }.value
+
+            guard let self else { return }
+            self.isAnalyzing = false
+            guard !Task.isCancelled else { return }
+            if let result, !result.pairs.isEmpty {
+                self.comparison = result.pairs
+                self.comparisonStrategies = result.strategies
+                self.logoNote = nil
+            } else {
+                self.logoNote = String(localized: "The comparison could not be made.")
+            }
+        }
+    }
+
+    func clearComparison() {
+        comparison = []
+    }
+
+    func cancelAnalysis() {
+        analysisTask?.cancel()
+        isAnalyzing = false
+    }
+
     func reset() {
+        regions = []
+        crop = nil
+        comparison = []
+        logoNote = nil
         selectionStart = 0
         selectionEnd = duration
         crossfade = 0

@@ -21,8 +21,9 @@ struct OptimizedPlaybackAsset: Codable, Hashable, Sendable {
     /// The edits this rendition was produced with. When the asset's recipe
     /// no longer matches, the rendition is stale and is produced again.
     var recipe: EditRecipe = .empty
-    /// How each marked logo was removed (`WatermarkStrategy` raw values), in
-    /// the order of the recipe's regions.
+    /// How logos were removed (`WatermarkStrategy` raw values): `reframe`
+    /// first when the picture was cropped, then one entry per marked region
+    /// in the order of the recipe.
     var watermarkStrategies: [String] = []
 }
 

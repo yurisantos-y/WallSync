@@ -185,6 +185,22 @@
         }
       }
     },
+    "A frame of the video. Drag to mark a logo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A frame of the video. Drag to mark a logo."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Um quadro do vídeo. Arraste para marcar um logotipo."
+          }
+        }
+      }
+    },
     "A playlist changes the wallpaper by itself. The wallpaper chosen above is used while the playlist has nothing to show.": {
       "localizations": {
         "en": {
@@ -313,6 +329,22 @@
         }
       }
     },
+    "After": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "After"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Depois"
+          }
+        }
+      }
+    },
     "After a while": {
       "localizations": {
         "en": {
@@ -341,6 +373,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Todos os monitores"
+          }
+        }
+      }
+    },
+    "Analyzing the video": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyzing the video"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analisando o vídeo"
           }
         }
       }
@@ -641,6 +689,22 @@
         }
       }
     },
+    "Before": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antes"
+          }
+        }
+      }
+    },
     "By time of day": {
       "localizations": {
         "en": {
@@ -717,6 +781,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Trocar a cada"
+          }
+        }
+      }
+    },
+    "Check the suggested areas, and adjust or remove them if needed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the suggested areas, and adjust or remove them if needed."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confira as áreas sugeridas e ajuste ou remova se for preciso."
           }
         }
       }
@@ -813,6 +893,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Melhor correspondência encontrada. Um crossfade curto esconde a diferença que resta."
+          }
+        }
+      }
+    },
+    "Compare before and after": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compare before and after"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comparar antes e depois"
           }
         }
       }
@@ -1185,6 +1281,22 @@
         }
       }
     },
+    "Drag over each logo, date stamp or fixed text to mark it.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drag over each logo, date stamp or fixed text to mark it."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arraste sobre cada logotipo, carimbo de data ou texto fixo para marcá-lo."
+          }
+        }
+      }
+    },
     "Each display shows its own part of the same video, as if the screens were windows onto one picture. The video is still decoded only once.": {
       "localizations": {
         "en": {
@@ -1201,50 +1313,50 @@
         }
       }
     },
-    "Edit loop": {
+    "Edit %@": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Edit loop"
+            "value": "Edit %@"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Editar loop"
+            "value": "Editar %@"
           }
         }
       }
     },
-    "Edit loop…": {
+    "Edit areas": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Edit loop…"
+            "value": "Edit areas"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Editar loop…"
+            "value": "Editar áreas"
           }
         }
       }
     },
-    "Edit the loop of %@": {
+    "Edit video": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Edit the loop of %@"
+            "value": "Edit video"
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Editar o loop de %@"
+            "value": "Editar vídeo"
           }
         }
       }
@@ -1261,6 +1373,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Editado"
+          }
+        }
+      }
+    },
+    "Editor page": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editor page"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Página do editor"
           }
         }
       }
@@ -1293,6 +1421,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Edições não aplicadas"
+          }
+        }
+      }
+    },
+    "Edit…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit…"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar…"
           }
         }
       }
@@ -1437,6 +1581,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Preencher a tela"
+          }
+        }
+      }
+    },
+    "Filled from neighboring frames": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filled from neighboring frames"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preenchido a partir de quadros vizinhos"
+          }
+        }
+      }
+    },
+    "Filled from the surroundings": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filled from the surroundings"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preenchido a partir da vizinhança"
           }
         }
       }
@@ -1857,6 +2033,22 @@
         }
       }
     },
+    "Logo removal: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logo removal: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remoção de logotipo: %@"
+          }
+        }
+      }
+    },
     "Looking for loop points": {
       "localizations": {
         "en": {
@@ -1869,6 +2061,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Procurando pontos de loop"
+          }
+        }
+      }
+    },
+    "Looks for areas that stay the same while the rest of the video changes.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Looks for areas that stay the same while the rest of the video changes."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Procura áreas que ficam iguais enquanto o resto do vídeo muda."
+          }
+        }
+      }
+    },
+    "Loop": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loop"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loop"
           }
         }
       }
@@ -1965,6 +2189,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Monitor principal"
+          }
+        }
+      }
+    },
+    "Method: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Method: %@"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Método: %@"
+          }
+        }
+      }
+    },
+    "Moment": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moment"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Momento"
           }
         }
       }
@@ -2093,6 +2349,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nenhum monitor encontrado"
+          }
+        }
+      }
+    },
+    "No fixed logo was found. Draw a rectangle over it.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No fixed logo was found. Draw a rectangle over it."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum logotipo fixo foi encontrado. Desenhe um retângulo sobre ele."
           }
         }
       }
@@ -3217,6 +3489,38 @@
         }
       }
     },
+    "Reframe instead": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reframe instead"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reenquadrar"
+          }
+        }
+      }
+    },
+    "Reframed: the logo is outside the picture": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reframed: the logo is outside the picture"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reenquadrado: o logotipo ficou fora da imagem"
+          }
+        }
+      }
+    },
     "Remove": {
       "localizations": {
         "en": {
@@ -3261,6 +3565,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Remover %@ da playlist"
+          }
+        }
+      }
+    },
+    "Remove logo or mark": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove logo or mark"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover logotipo ou marca"
+          }
+        }
+      }
+    },
+    "Remove marked area %lld": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove marked area %lld"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remover a área marcada %lld"
           }
         }
       }
@@ -3969,6 +4305,22 @@
         }
       }
     },
+    "The comparison could not be made.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The comparison could not be made."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Não foi possível fazer a comparação."
+          }
+        }
+      }
+    },
     "The edits to “%@” could not be applied. The previous version keeps playing.": {
       "localizations": {
         "en": {
@@ -4029,6 +4381,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "O arquivo “%1$@” estava danificado e foi redefinido. Uma cópia foi mantida como “%2$@”."
+          }
+        }
+      }
+    },
+    "The frame after removal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The frame after removal"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O quadro depois da remoção"
+          }
+        }
+      }
+    },
+    "The frame before removal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The frame before removal"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O quadro antes da remoção"
           }
         }
       }
@@ -4289,6 +4673,38 @@
         }
       }
     },
+    "Translucent logo un-mixed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Translucent logo un-mixed"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Logotipo translúcido desfeito"
+          }
+        }
+      }
+    },
+    "Undo reframing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo reframing"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desfazer reenquadramento"
+          }
+        }
+      }
+    },
     "Unknown": {
       "localizations": {
         "en": {
@@ -4369,18 +4785,34 @@
         }
       }
     },
-    "Use the whole video, without a crossfade.": {
+    "Use the whole video, without a crossfade or any removal.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Use the whole video, without a crossfade."
+            "value": "Use the whole video, without a crossfade or any removal."
           }
         },
         "pt-BR": {
           "stringUnit": {
             "state": "translated",
-            "value": "Usa o vídeo inteiro, sem crossfade."
+            "value": "Usa o vídeo inteiro, sem crossfade e sem remoção."
+          }
+        }
+      }
+    },
+    "Use this only with videos you have the right to use and modify.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use this only with videos you have the right to use and modify."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use apenas com vídeos que você tem o direito de usar e modificar."
           }
         }
       }
@@ -4781,6 +5213,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Seus vídeos e o wallpaper de todos os monitores."
+          }
+        }
+      }
+    },
+    "Zooming in slightly puts the logo outside the picture, with nothing filled in. It gives up %lld%% of the picture.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zooming in slightly puts the logo outside the picture, with nothing filled in. It gives up %lld%% of the picture."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Um pequeno zoom deixa o logotipo fora da imagem, sem nada inventado. Perde-se %lld%% da imagem."
           }
         }
       }

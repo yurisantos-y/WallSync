@@ -7,6 +7,12 @@ struct AssetEditorView: View {
     @Environment(AppCoordinator.self) private var coordinator
     @Environment(\.dismiss) private var dismiss
     @State private var model: AssetEditorModel
+    @State private var page = Page.loop
+
+    private enum Page: Hashable {
+        case loop
+        case logo
+    }
 
     init(asset: WallpaperAsset) {
         _model = State(initialValue: AssetEditorModel(asset: asset))
@@ -14,18 +20,32 @@ struct AssetEditorView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Edit loop")
-                    .font(.title2.weight(.semibold))
-                Text(model.asset.displayName)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Edit video")
+                        .font(.title2.weight(.semibold))
+                    Text(model.asset.displayName)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Picker("Editor page", selection: $page) {
+                    Text("Loop").tag(Page.loop)
+                    Text("Remove logo or mark").tag(Page.logo)
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+                .labelsHidden()
+                .accessibilityLabel(Text("Editor page"))
             }
 
-            preview
-
-            if model.phase == .ready {
-                loopControls
+            if page == .loop || model.phase != .ready {
+                preview
+                if model.phase == .ready {
+                    loopControls
+                }
+            } else {
+                LogoRemovalView(model: model)
             }
 
             Divider()
@@ -33,7 +53,7 @@ struct AssetEditorView: View {
             HStack {
                 Button("Reset") { model.reset() }
                     .disabled(model.phase != .ready)
-                    .help(Text("Use the whole video, without a crossfade."))
+                    .help(Text("Use the whole video, without a crossfade or any removal."))
 
                 Spacer()
 

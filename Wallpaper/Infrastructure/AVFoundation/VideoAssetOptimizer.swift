@@ -102,6 +102,10 @@ actor VideoAssetOptimizer {
         try? fileManager.createDirectory(at: optimizedDirectory, withIntermediateDirectories: true)
         removePartialFiles(named: partial.lastPathComponent)
 
+        // A reframed video has a logo outside the picture; regions that
+        // are still marked add their own strategies after it.
+        var watermarkStrategies: [WatermarkStrategy] = recipe.crop != nil ? [.reframe] : []
+
         let signpost = Signpost.begin(Signpost.Name.transcode)
         defer { Signpost.end(Signpost.Name.transcode, signpost) }
 
@@ -121,7 +125,7 @@ actor VideoAssetOptimizer {
                 Log.importing.info(
                     "asset \(assetID.uuidString, privacy: .public): applying edits (trim=\(recipe.trim != nil) crossfade=\(recipe.loopCrossfade, format: .fixed(precision: 2))s marks=\(recipe.watermarkRegions.count) crop=\(recipe.crop != nil)) to \(transcodePlan.codec.rawValue, privacy: .public) \(Int(transcodePlan.pixelSize.width))x\(Int(transcodePlan.pixelSize.height))"
                 )
-                try await editTranscode(
+                watermarkStrategies += try await editTranscode(
                     sourceAsset: sourceAsset,
                     videoTrack: videoTrack,
                     naturalSize: naturalSize,
@@ -130,6 +134,7 @@ actor VideoAssetOptimizer {
                     keptRange: keptRange,
                     crossfade: timing.crossfade,
                     crop: recipe.crop,
+                    watermarkRegions: recipe.watermarkRegions,
                     minFrameDuration: minFrameDuration,
                     sourceFrameRate: Double(nominalFrameRate),
                     sourceColor: color,
@@ -172,7 +177,8 @@ actor VideoAssetOptimizer {
             plan: plan,
             source: source,
             target: target,
-            recipe: requestedRecipe
+            recipe: requestedRecipe,
+            watermarkStrategies: watermarkStrategies
         )
     }
 
@@ -211,7 +217,8 @@ actor VideoAssetOptimizer {
         plan: OptimizationPlan,
         source: SourceVideoDescription,
         target: OptimizationTarget,
-        recipe: EditRecipe = .empty
+        recipe: EditRecipe = .empty,
+        watermarkStrategies: [WatermarkStrategy] = []
     ) async throws -> OptimizedPlaybackAsset {
         let asset = AVURLAsset(url: url)
         guard let track = try await asset.loadTracks(withMediaType: .video).first else {
@@ -245,7 +252,8 @@ actor VideoAssetOptimizer {
             isPassthrough: isPassthrough,
             bitDepth: color.bitDepth,
             isHDR: color.isHDR,
-            recipe: recipe
+            recipe: recipe,
+            watermarkStrategies: watermarkStrategies.map(\.rawValue)
         )
     }
 
@@ -453,13 +461,14 @@ actor VideoAssetOptimizer {
         keptRange: CMTimeRange,
         crossfade: TimeInterval,
         crop: CGRect?,
+        watermarkRegions: [CGRect] = [],
         minFrameDuration: CMTime,
         sourceFrameRate: Double,
         sourceColor: VideoColorDescription,
         plan: TranscodePlan,
         destination: URL,
         progress: @escaping @Sendable (Double) -> Void
-    ) async throws {
+    ) async throws -> [WatermarkStrategy] {
         let colorProperties = Self.outputColor(sourceColor: sourceColor, plan: plan).videoColorProperties
         let frameDuration = Self.frameDuration(
             sourceFrameRate: sourceFrameRate, minFrameDuration: minFrameDuration, plan: plan
@@ -468,7 +477,7 @@ actor VideoAssetOptimizer {
             ? kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
             : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
 
-        func makeReader(range: CMTimeRange) throws -> (AVAssetReader, AVAssetReaderVideoCompositionOutput) {
+        func makeReader(range: CMTimeRange, frameDuration: CMTime = frameDuration) throws -> (AVAssetReader, AVAssetReaderVideoCompositionOutput) {
             let reader = try AVAssetReader(asset: sourceAsset)
             reader.timeRange = range
             let output = AVAssetReaderVideoCompositionOutput(
@@ -499,9 +508,49 @@ actor VideoAssetOptimizer {
         let head = hasDissolve ? try makeReader(range: CMTimeRange(start: keptRange.start, duration: dissolve)) : nil
 
         var processor: PlaneProcessor?
-        if hasDissolve {
+        if hasDissolve || !watermarkRegions.isEmpty {
             guard let created = PlaneProcessor() else { throw VideoOptimizationError.processingUnavailable }
             processor = created
+        }
+
+        // Logo removal: look at frames spread over the video first, to
+        // decide how each region is removed and to measure translucent marks.
+        var mainRemover: WatermarkRemover?
+        var headRemover: WatermarkRemover?
+        if let processor, !watermarkRegions.isEmpty {
+            // With a crop, regions are still given in the full picture.
+            let regions = watermarkRegions.compactMap { region -> CGRect? in
+                guard let crop else { return region }
+                let visible = region.intersection(crop)
+                guard !visible.isNull, visible.width > 0, visible.height > 0 else { return nil }
+                return CGRect(
+                    x: (visible.minX - crop.minX) / crop.width, y: (visible.minY - crop.minY) / crop.height,
+                    width: visible.width / crop.width, height: visible.height / crop.height
+                )
+            }
+            let sampleCount = 24.0
+            let sampler = try makeReader(
+                range: keptRange,
+                frameDuration: CMTime(seconds: max(keptRange.duration.seconds / sampleCount, frameDuration.seconds), preferredTimescale: 60_000)
+            )
+            guard sampler.0.startReading() else { throw sampler.0.error ?? VideoOptimizationError.readerSetupFailed }
+            var samples: [CVPixelBuffer] = []
+            while let sample = sampler.1.copyNextSampleBuffer() {
+                try Task.checkCancellation()
+                if let buffer = CMSampleBufferGetImageBuffer(sample) { samples.append(buffer) }
+            }
+            sampler.0.cancelReading()
+
+            let plans = try WatermarkRemover.plan(regions: regions, samples: samples, processor: processor)
+            if !plans.isEmpty {
+                // 4:2:0: one and a half samples per pixel, one or two bytes each.
+                let frameBytes = Int(plan.pixelSize.width * plan.pixelSize.height) * 3 / 2 * (plan.isTenBit ? 2 : 1)
+                let frameRate = 1 / max(frameDuration.seconds, 0.001)
+                mainRemover = WatermarkRemover(processor: processor, plans: plans, frameRate: frameRate, frameBytes: frameBytes)
+                if hasDissolve {
+                    headRemover = WatermarkRemover(processor: processor, plans: plans, frameRate: frameRate, frameBytes: frameBytes)
+                }
+            }
         }
 
         let writer = try AVAssetWriter(outputURL: destination, fileType: .mp4)
@@ -525,12 +574,16 @@ actor VideoAssetOptimizer {
             writerInput: writerInput,
             adaptor: adaptor,
             processor: processor,
+            mainRemover: mainRemover,
+            headRemover: headRemover,
             dissolveStart: outputDuration - crossfade,
             dissolveDuration: crossfade,
             frameDuration: frameDuration,
             outputDuration: outputDuration,
             progress: progress
         ).run()
+
+        return mainRemover?.usedStrategies ?? []
     }
 
     private static func videoComposition(
@@ -739,6 +792,8 @@ private final class EditSession: @unchecked Sendable {
     private let writerInput: AVAssetWriterInput
     private let adaptor: AVAssetWriterInputPixelBufferAdaptor
     private let processor: PlaneProcessor?
+    private let mainRemover: WatermarkRemover?
+    private let headRemover: WatermarkRemover?
     private let dissolveStart: Double
     private let dissolveDuration: Double
     private let frameDuration: CMTime
@@ -762,12 +817,16 @@ private final class EditSession: @unchecked Sendable {
         writerInput: AVAssetWriterInput,
         adaptor: AVAssetWriterInputPixelBufferAdaptor,
         processor: PlaneProcessor?,
+        mainRemover: WatermarkRemover? = nil,
+        headRemover: WatermarkRemover? = nil,
         dissolveStart: Double,
         dissolveDuration: Double,
         frameDuration: CMTime,
         outputDuration: Double,
         progress: @escaping @Sendable (Double) -> Void
     ) {
+        self.mainRemover = mainRemover
+        self.headRemover = headRemover
         self.mainReader = mainReader
         self.mainOutput = mainOutput
         self.headReader = headReader
@@ -850,13 +909,18 @@ private final class EditSession: @unchecked Sendable {
                 return
             }
 
-            guard let sample = mainOutput.copyNextSampleBuffer() else {
+            let next: (frame: CVPixelBuffer, time: CMTime)?
+            do {
+                next = try nextFrame(from: mainOutput, remover: mainRemover)
+            } catch {
+                finish(with: error)
+                return
+            }
+            guard let (frame, time) = next else {
                 finish(with: nil)
                 return
             }
-            guard let frame = CMSampleBufferGetImageBuffer(sample) else { continue }
 
-            let time = CMSampleBufferGetPresentationTimeStamp(sample)
             let first = firstTime ?? time
             firstTime = first
             let outputTime = time - first
@@ -865,8 +929,7 @@ private final class EditSession: @unchecked Sendable {
             var output = frame
             do {
                 if let processor, let headOutput, dissolveDuration > 0, seconds >= dissolveStart - 0.0005,
-                   let headSample = headOutput.copyNextSampleBuffer(),
-                   let headFrame = CMSampleBufferGetImageBuffer(headSample) {
+                   let headFrame = try nextFrame(from: headOutput, remover: headRemover)?.frame {
                     // Even steps from the last untouched frame to the first
                     // frame of the next pass of the loop.
                     let step = frameDuration.seconds
@@ -884,6 +947,33 @@ private final class EditSession: @unchecked Sendable {
             }
             lastOutputTime = outputTime
             report(seconds)
+        }
+    }
+
+    /// The next frame of a stream, with logos removed when a remover is
+    /// attached. The remover looks a few frames ahead, so input is fed to it
+    /// until it can release a frame.
+    private func nextFrame(
+        from output: AVAssetReaderOutput, remover: WatermarkRemover?
+    ) throws -> (frame: CVPixelBuffer, time: CMTime)? {
+        guard let remover else {
+            while let sample = output.copyNextSampleBuffer() {
+                if let frame = CMSampleBufferGetImageBuffer(sample) {
+                    return (frame, CMSampleBufferGetPresentationTimeStamp(sample))
+                }
+            }
+            return nil
+        }
+
+        while true {
+            if let ready = try remover.pop() { return ready }
+            guard let sample = output.copyNextSampleBuffer() else {
+                remover.finish()
+                return try remover.pop()
+            }
+            if let frame = CMSampleBufferGetImageBuffer(sample) {
+                remover.push(frame, time: CMSampleBufferGetPresentationTimeStamp(sample))
+            }
         }
     }
 

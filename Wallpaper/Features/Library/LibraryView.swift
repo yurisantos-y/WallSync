@@ -114,6 +114,15 @@ struct LibraryView: View {
                         }
                     }
 
+                    if let strategies = asset.optimizedPlayback?.watermarkStrategies, !strategies.isEmpty, activity == nil {
+                        let labels = Set(strategies.compactMap(WatermarkStrategy.init(rawValue:)))
+                            .sorted { $0.rawValue < $1.rawValue }
+                            .map(\.localizedLabel)
+                        Text("Logo removal: \(labels.joined(separator: ", "))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
                     if !profile.reasonCodes.isEmpty {
                         Text("Notes: \(profile.reasonCodes.map(AssetInspector.reasonLabel(for:)).joined(separator: ", "))")
                             .font(.caption)
@@ -157,12 +166,12 @@ struct LibraryView: View {
                         .buttonStyle(.borderedProminent)
                         .disabled(profile.tier == .unsupported && activity == nil)
 
-                        Button("Edit loop…") {
+                        Button("Edit…") {
                             editedAsset = asset
                         }
                         .buttonStyle(.bordered)
                         .disabled(asset.optimizationState != .ready)
-                        .accessibilityLabel(Text("Edit the loop of \(asset.displayName)"))
+                        .accessibilityLabel(Text("Edit \(asset.displayName)"))
 
                         Button("Remove", role: .destructive) {
                             coordinator.removeAsset(asset)

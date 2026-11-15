@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreVideo
+import Metal
 import VideoToolbox
 import XCTest
 @testable import WallSync
@@ -130,6 +131,23 @@ enum FrameFactory {
             if let buffer = CMSampleBufferGetImageBuffer(sample) { frames.append(buffer) }
         }
         return frames
+    }
+}
+
+/// Not skippable: a shader that does not compile must fail the suite, not
+/// quietly disable every test that needs the processor.
+final class PlaneShaderCompilationTests: XCTestCase {
+    func testShadersCompileWheneverThereIsAMetalDevice() throws {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            throw XCTSkip("no Metal device on this machine")
+        }
+        do {
+            let library = try PlaneProcessor.compileShaders(on: device)
+            XCTAssertNotNil(library.makeFunction(name: "crossfade"))
+            XCTAssertNotNil(library.makeFunction(name: "removeMark"))
+        } catch {
+            XCTFail("shader compilation failed: \(error)")
+        }
     }
 }
 
