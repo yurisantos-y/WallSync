@@ -48,6 +48,9 @@ final class AppCoordinator {
     @ObservationIgnored private var startupIssues: [StorageIssue] = []
     @ObservationIgnored private var hasLoadedPersistedState = false
     @ObservationIgnored private var openMainWindowAction: (() -> Void)?
+    /// Callers (Shortcuts actions, Focus filters) waiting for the saved
+    /// state to be loaded.
+    @ObservationIgnored private var restoreWaiters: [CheckedContinuation<Void, Never>] = []
 
     var assets: [WallpaperAsset] = []
     var placements: [WallpaperPlacement] = []
@@ -167,6 +170,8 @@ final class AppCoordinator {
         self.statusItemController.onApplyWallpaper = { [weak self] assetID, displayUUID in
             self?.applyWallpaper(assetID, toDisplayUUID: displayUUID)
         }
+        AppIntentBridge.coordinator = self
+
         self.statusItemController.onNextWallpaper = { [weak self] in
             self?.advancePlaylists()
         }
@@ -187,6 +192,10 @@ final class AppCoordinator {
 
         Task {
             await loadPersistedState()
+            // A Focus that was already on when the app started.
+            if let filter = try? await WallSyncFocusFilter.current {
+                focusOverride = filter.focusOverride
+            }
             scheduleReconcile(trigger: .appLaunch, reason: "initial_restore")
         }
     }
@@ -955,6 +964,9 @@ final class AppCoordinator {
         startupLoginState = startupLoginManager.currentState()
         hasLoadedPersistedState = true
         refreshRuntimeState()
+        let waiters = restoreWaiters
+        restoreWaiters = []
+        waiters.forEach { $0.resume() }
 
         startupIssues.append(
             contentsOf: [loadedPreferences.issue, loadedPlacements.issue, loadedPlaylists.issue, loadedAssets.issue, bookmarkIssue].compactMap { $0 }
@@ -1021,6 +1033,52 @@ final class AppCoordinator {
         if runtimeState.isFocusPaused != focusPaused {
             updateRuntimeState { $0.isFocusPaused = focusPaused }
         }
+    }
+
+    // MARK: - Shortcuts and Focus
+
+    /// Returns once the saved library, assignments and playlists are loaded.
+    func waitUntilRestored() async {
+        guard !hasLoadedPersistedState else { return }
+        await withCheckedContinuation { restoreWaiters.append($0) }
+    }
+
+    /// Carries out a Shortcuts action after checking it against the current
+    /// library and displays. Like every other change, it only edits the
+    /// state the resolver reads; the session queue does the rest.
+    func perform(_ request: WallpaperActionRequest) throws {
+        do {
+            try IntentRequestValidator.validate(
+                request,
+                assets: assets,
+                playlists: playlists,
+                displays: displayManager.currentDisplays(),
+                advanceablePlaylistIDs: Set(activePlaylists.filter(canAdvance).map(\.id))
+            )
+        } catch let error as WallpaperActionError {
+            throw WallpaperIntentError.action(error)
+        }
+
+        switch request {
+        case let .setWallpaper(assetID, displayUUID):
+            refreshRuntimeState()
+            applyWallpaper(assetID, toDisplayUUID: displayUUID)
+        case let .activatePlaylist(playlistID, displayUUID):
+            refreshRuntimeState()
+            activatePlaylist(playlistID, on: displayUUID.flatMap { uuid in runtimeState.activeDisplays.first { $0.displayUUID == uuid } })
+        case .nextWallpaper:
+            advancePlaylists()
+        }
+    }
+
+    /// Sets or clears the temporary layer of a Focus filter. The saved
+    /// assignments are not touched: with the override gone, the resolver
+    /// simply gives back what they say.
+    func setFocusOverride(_ override: FocusOverride?) {
+        guard focusOverride != override else { return }
+        focusOverride = override
+        Log.session.info("focus filter: \(override == nil ? "cleared" : "active", privacy: .public)")
+        reconcileImmediately(reason: override == nil ? "focus_ended" : "focus_started")
     }
 
     // MARK: - Playlist schedule

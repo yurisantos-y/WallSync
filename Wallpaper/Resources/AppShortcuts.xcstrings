@@ -1,0 +1,42 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Next ${applicationName} wallpaper": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Next ${applicationName} wallpaper" } },
+        "pt-BR": { "stringUnit": { "state": "translated", "value": "Próximo wallpaper do ${applicationName}" } }
+      }
+    },
+    "Next wallpaper in ${applicationName}": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Next wallpaper in ${applicationName}" } },
+        "pt-BR": { "stringUnit": { "state": "translated", "value": "Próximo wallpaper no ${applicationName}" } }
+      }
+    },
+    "Pause ${applicationName} wallpapers": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Pause ${applicationName} wallpapers" } },
+        "pt-BR": { "stringUnit": { "state": "translated", "value": "Pausar os wallpapers do ${applicationName}" } }
+      }
+    },
+    "Pause or resume ${applicationName}": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Pause or resume ${applicationName}" } },
+        "pt-BR": { "stringUnit": { "state": "translated", "value": "Pausar ou retomar o ${applicationName}" } }
+      }
+    },
+    "Resume ${applicationName} wallpapers": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Resume ${applicationName} wallpapers" } },
+        "pt-BR": { "stringUnit": { "state": "translated", "value": "Retomar os wallpapers do ${applicationName}" } }
+      }
+    },
+    "Toggle ${applicationName} wallpapers": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Toggle ${applicationName} wallpapers" } },
+        "pt-BR": { "stringUnit": { "state": "translated", "value": "Alternar os wallpapers do ${applicationName}" } }
+      }
+    }
+  },
+  "version": "1.0"
+}
