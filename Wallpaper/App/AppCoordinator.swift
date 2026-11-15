@@ -731,6 +731,11 @@ final class AppCoordinator {
             $0.lowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
             $0.thermalState = thermalMonitor.currentThermalState()
             $0.reduceMotionEnabled = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            // Safety net: if the "unlocked" notification was missed, the
+            // session dictionary still tells the truth.
+            if $0.isScreenLocked && !SystemEventMonitor.isScreenCurrentlyLocked {
+                $0.isScreenLocked = false
+            }
         }
     }
 

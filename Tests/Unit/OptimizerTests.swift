@@ -278,7 +278,7 @@ final class VideoOptimizerIntegrationTests: XCTestCase {
     private var storage: StorageLocations!
 
     override func setUpWithError() throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil, "requires hardware video encoders")
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SKIP_MEDIA_TESTS"] != nil, "media pipeline tests disabled by SKIP_MEDIA_TESTS")
         root = try Fixture.temporaryDirectory()
         storage = StorageLocations(root: root)
         try storage.prepareDirectories()

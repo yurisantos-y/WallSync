@@ -23,13 +23,14 @@ private final class HostingSurface: WallpaperSurface, VideoFrameHosting {
 }
 
 /// Exercises the real AVFoundation pipeline with a clip generated at test
-/// time. Needs a working media stack, so it is skipped on headless CI.
+/// time. Set `TEST_RUNNER_SKIP_MEDIA_TESTS=1` to skip on machines without a
+/// working media stack.
 @MainActor
 final class PlaybackEngineTests: XCTestCase {
     private var directory: URL!
 
     override func setUp() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil, "requires a real media pipeline")
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SKIP_MEDIA_TESTS"] != nil, "media pipeline tests disabled by SKIP_MEDIA_TESTS")
         directory = try Fixture.temporaryDirectory()
     }
 
