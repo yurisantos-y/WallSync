@@ -14,6 +14,9 @@ protocol WallpaperSurface: AnyObject {
     func update(displayTarget: DisplayTarget)
     func setContentMode(_ contentMode: WallpaperPlacement.ContentMode)
     func setPoster(_ image: CGImage?)
+    /// The part of the picture this display shows (unit rectangle, origin
+    /// top-left) when one video spans several displays; `nil` shows it all.
+    func setContentCrop(_ crop: CGRect?)
     /// A colour laid over poster and video alike; `nil` removes it.
     func setDimming(_ overlay: DimOverlay?)
     func showPoster()
@@ -47,6 +50,7 @@ protocol SharedPlaybackEngine: AnyObject {
 }
 
 extension WallpaperSurface {
+    func setContentCrop(_ crop: CGRect?) {}
     func setDimming(_ overlay: DimOverlay?) {}
 }
 

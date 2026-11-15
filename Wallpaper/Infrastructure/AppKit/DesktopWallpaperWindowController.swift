@@ -57,6 +57,10 @@ final class DesktopWallpaperWindowController: NSWindowController, WallpaperSurfa
         hostView.setPoster(image)
     }
 
+    func setContentCrop(_ crop: CGRect?) {
+        hostView.setContentCrop(crop)
+    }
+
     func setDimming(_ overlay: DimOverlay?) {
         hostView.setDimming(overlay)
     }

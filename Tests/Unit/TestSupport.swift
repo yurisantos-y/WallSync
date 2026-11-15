@@ -149,6 +149,9 @@ final class FakeSurface: WallpaperSurface {
     func update(displayTarget: DisplayTarget) { self.displayTarget = displayTarget }
     func setContentMode(_ contentMode: WallpaperPlacement.ContentMode) { self.contentMode = contentMode }
     func setPoster(_ image: CGImage?) { posterSetCount += 1 }
+    private(set) var cropHistory: [CGRect?] = []
+    var crop: CGRect? { cropHistory.last ?? nil }
+    func setContentCrop(_ crop: CGRect?) { cropHistory.append(crop) }
     private(set) var dimmingHistory: [DimOverlay?] = []
     var dimming: DimOverlay? { dimmingHistory.last ?? nil }
     func setDimming(_ overlay: DimOverlay?) { dimmingHistory.append(overlay) }

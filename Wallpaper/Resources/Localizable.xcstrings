@@ -945,6 +945,22 @@
         }
       }
     },
+    "Each display shows its own part of the same video, as if the screens were windows onto one picture. The video is still decoded only once.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Each display shows its own part of the same video, as if the screens were windows onto one picture. The video is still decoded only once."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cada monitor mostra a sua parte do mesmo vídeo, como se as telas fossem janelas para uma só imagem. O vídeo continua sendo decodificado uma única vez."
+          }
+        }
+      }
+    },
     "Edit loop": {
       "localizations": {
         "en": {
@@ -1297,6 +1313,22 @@
         }
       }
     },
+    "Horizontal position": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Horizontal position"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Posição horizontal"
+          }
+        }
+      }
+    },
     "How WallSync behaves when it opens and how videos are prepared.": {
       "localizations": {
         "en": {
@@ -1581,6 +1613,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Monitor principal"
+          }
+        }
+      }
+    },
+    "Needs at least two displays using the wallpaper for all displays.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs at least two displays using the wallpaper for all displays."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Requer pelo menos dois monitores usando o wallpaper de todos os monitores."
           }
         }
       }
@@ -2865,6 +2913,22 @@
         }
       }
     },
+    "Stretch one video across the displays": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stretch one video across the displays"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estender um vídeo por todos os monitores"
+          }
+        }
+      }
+    },
     "Suggest": {
       "localizations": {
         "en": {
@@ -3357,6 +3421,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "Versão"
+          }
+        }
+      }
+    },
+    "Vertical position": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vertical position"
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Posição vertical"
           }
         }
       }

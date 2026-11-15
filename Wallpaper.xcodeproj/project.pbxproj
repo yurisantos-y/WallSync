@@ -25,6 +25,7 @@
 		26A1928628CF3E56DA7CC006 /* StatusSummary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 716D925B876774FCFB65EEBB /* StatusSummary.swift */; };
 		2D0ED87BB75222B762E67B0F /* PlaylistSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41D28590A277D88C6F4A3CC7 /* PlaylistSchedule.swift */; };
 		2F1173786ADB31092BB27566 /* DesktopWallpaperWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCF05AF39461ECF10F8B6B7F /* DesktopWallpaperWindow.swift */; };
+		2F5458FF30B19F8C243FF1E8 /* PanoramaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 740E134618937A43A00DBD4E /* PanoramaTests.swift */; };
 		311BA763149FEF1174055511 /* ResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FB1690FF5A7525ED03440B2 /* ResolverTests.swift */; };
 		32D65091ED65DBCD8B5A697B /* WindowListSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00B077CE2220ACD293BD4688 /* WindowListSnapshot.swift */; };
 		383B99FDA75EFEA62319B55F /* AccessBookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5AE67FEA80F0A059C1E262 /* AccessBookmark.swift */; };
@@ -103,6 +104,7 @@
 		D34ABFE3A1FF1E0785F8B780 /* AssetEditorModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31BCF131F44B451054B887AE /* AssetEditorModel.swift */; };
 		DAD27EC36D6043AF20CF69E8 /* MetricsSubscriber.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3C2AD82261E6A84969BF301 /* MetricsSubscriber.swift */; };
 		DDDA4D310BD8F59E9E5B9BA7 /* GeneralSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 146420A48A1824080F224545 /* GeneralSettingsView.swift */; };
+		DECCD04ADF27C8384D231624 /* PanoramaLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9677276BF394D3961AD8F95 /* PanoramaLayout.swift */; };
 		F40F00247AC0D65DEC57D5AE /* WindowListProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 019D7E640C8622F5A1C18C7D /* WindowListProvider.swift */; };
 		F543D226953A965B94F9265E /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBFE01CD35D6D91C783323D8 /* TestSupport.swift */; };
 		FB1F92F79540728F883D2088 /* VideoCapabilityInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EB7554041A0D264BF1454D4 /* VideoCapabilityInspector.swift */; };
@@ -167,6 +169,7 @@
 		716D925B876774FCFB65EEBB /* StatusSummary.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StatusSummary.swift; path = Wallpaper/Core/Policies/StatusSummary.swift; sourceTree = "<group>"; };
 		7174A2E713A80764C3421225 /* StatusItemController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StatusItemController.swift; path = Wallpaper/App/StatusItemController.swift; sourceTree = "<group>"; };
 		7192FEBD9257C2FDA742A092 /* DisplayTarget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = DisplayTarget.swift; path = Wallpaper/Core/Domain/DisplayTarget.swift; sourceTree = "<group>"; };
+		740E134618937A43A00DBD4E /* PanoramaTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PanoramaTests.swift; path = Tests/Unit/PanoramaTests.swift; sourceTree = "<group>"; };
 		769C5C6681CCA99AD1B92B83 /* WallpaperPlacementEditor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WallpaperPlacementEditor.swift; path = Wallpaper/Features/Displays/WallpaperPlacementEditor.swift; sourceTree = "<group>"; };
 		76BED63829E7F296435972D1 /* StartupRestoreGate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StartupRestoreGate.swift; path = Wallpaper/Core/Policies/StartupRestoreGate.swift; sourceTree = "<group>"; };
 		77428373BFA26A03A612B480 /* PlaybackEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PlaybackEngineTests.swift; path = Tests/Unit/PlaybackEngineTests.swift; sourceTree = "<group>"; };
@@ -223,6 +226,7 @@
 		F0A170F59F9DA8AE395565BF /* UserPreferences.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = UserPreferences.swift; path = Wallpaper/Core/Domain/UserPreferences.swift; sourceTree = "<group>"; };
 		F182B9C2040327F860EEC6B1 /* EditRecipe.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = EditRecipe.swift; path = Wallpaper/Core/Domain/EditRecipe.swift; sourceTree = "<group>"; };
 		F73F470494EB0545D4F0350F /* WallpaperTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WallpaperTests.swift; path = Tests/Unit/WallpaperTests.swift; sourceTree = "<group>"; };
+		F9677276BF394D3961AD8F95 /* PanoramaLayout.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = PanoramaLayout.swift; path = Wallpaper/Core/Policies/PanoramaLayout.swift; sourceTree = "<group>"; };
 		F9FCCFFBEBB856191FFCD438 /* WallpaperAsset.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = WallpaperAsset.swift; path = Wallpaper/Core/Domain/WallpaperAsset.swift; sourceTree = "<group>"; };
 		FC851A17E668C4CA437FE4BA /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; name = Info.plist; path = Wallpaper/Resources/Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -285,6 +289,7 @@
 				CD637A95CD98CC2040B2D60E /* DimmingPolicy.swift */,
 				6674DD4091F8EE575A131B37 /* RecentWallpapers.swift */,
 				EFCCDF42277AA0AFB47B75DC /* LoopPointScorer.swift */,
+				F9677276BF394D3961AD8F95 /* PanoramaLayout.swift */,
 			);
 			name = Policies;
 			sourceTree = "<group>";
@@ -491,6 +496,7 @@
 				5D876FAA544E6C5F5E6B85E4 /* MenuTests.swift */,
 				35F1EC29C0C9585ED35AC432 /* EditPipelineTests.swift */,
 				2684D296CC90A5B8A70DC91E /* LoopSuggestionTests.swift */,
+				740E134618937A43A00DBD4E /* PanoramaTests.swift */,
 			);
 			name = Unit;
 			sourceTree = "<group>";
@@ -758,6 +764,7 @@
 				626CC82ED6874F01D27B78E6 /* AssetEditorView.swift in Sources */,
 				478D674097CADB11E42EB0E4 /* FrameSampler.swift in Sources */,
 				10328403A34D7F38C2DCA345 /* LoopPreviewBuilder.swift in Sources */,
+				DECCD04ADF27C8384D231624 /* PanoramaLayout.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -778,6 +785,7 @@
 				808DE47DAAF37CF3FD5EE120 /* MenuTests.swift in Sources */,
 				5D038396EFFF1885972FCF90 /* EditPipelineTests.swift in Sources */,
 				72B32B427DB9F55CB15942B8 /* LoopSuggestionTests.swift in Sources */,
+				2F5458FF30B19F8C243FF1E8 /* PanoramaTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

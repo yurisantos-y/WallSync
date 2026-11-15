@@ -35,6 +35,8 @@ final class WallpaperHostView: NSView {
     private let frameLayer = CALayer()
     let playerLayer = AVPlayerLayer()
     private var dimLayer: CALayer?
+    private var contentCrop: CGRect?
+    private var contentMode = WallpaperPlacement.ContentMode.aspectFill
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -42,6 +44,7 @@ final class WallpaperHostView: NSView {
         let rootLayer = CALayer()
         rootLayer.backgroundColor = NSColor.black.cgColor
         rootLayer.isOpaque = true
+        rootLayer.masksToBounds = true
         layer = rootLayer
 
         for layer in [posterLayer, videoContainer, frameLayer, playerLayer] {
@@ -67,13 +70,56 @@ final class WallpaperHostView: NSView {
     override func layout() {
         super.layout()
         withoutImplicitAnimations {
-            posterLayer.frame = bounds
             videoContainer.frame = bounds
-            frameLayer.frame = bounds
-            playerLayer.frame = bounds
             dimLayer?.frame = bounds
+            applyContentGeometry()
         }
     }
+
+    /// Shows only `crop` of the picture (unit rectangle, origin top-left),
+    /// for a video that spans several displays; `nil` shows all of it.
+    ///
+    /// Pure geometry: the content layers are given the frame the whole
+    /// picture would occupy and the view clips them to this display's part.
+    /// The same decoded surface is used by every display; nothing is copied
+    /// or scaled by the app.
+    func setContentCrop(_ crop: CGRect?) {
+        guard contentCrop != crop else { return }
+        contentCrop = crop
+        withoutImplicitAnimations {
+            applyContentGeometry()
+        }
+    }
+
+    private func applyContentGeometry() {
+        let frame: CGRect
+        if let crop = contentCrop, crop.width > 0, crop.height > 0 {
+            let size = CGSize(width: bounds.width / crop.width, height: bounds.height / crop.height)
+            frame = CGRect(
+                x: -crop.minX * size.width,
+                // Layer geometry grows upwards; the crop is measured from the top.
+                y: bounds.height - size.height + crop.minY * size.height,
+                width: size.width,
+                height: size.height
+            )
+            // The frame already has the picture's proportions.
+            posterLayer.contentsGravity = .resize
+            frameLayer.contentsGravity = .resize
+            playerLayer.videoGravity = .resize
+        } else {
+            frame = bounds
+            let gravity: CALayerContentsGravity = contentMode == .aspectFit ? .resizeAspect : .resizeAspectFill
+            posterLayer.contentsGravity = gravity
+            frameLayer.contentsGravity = gravity
+            playerLayer.videoGravity = contentMode == .aspectFit ? .resizeAspect : .resizeAspectFill
+        }
+        posterLayer.frame = frame
+        frameLayer.frame = frame
+        playerLayer.frame = frame
+    }
+
+    /// Frame of the content layers in view coordinates; used by tests.
+    var contentLayerFrame: CGRect { frameLayer.frame }
 
     /// Adds, updates or removes the dimming layer.
     func setDimming(_ overlay: DimOverlay?) {
@@ -110,11 +156,9 @@ final class WallpaperHostView: NSView {
     var rootSublayerCount: Int { layer?.sublayers?.count ?? 0 }
 
     func setContentMode(_ contentMode: WallpaperPlacement.ContentMode) {
+        self.contentMode = contentMode
         withoutImplicitAnimations {
-            let gravity: CALayerContentsGravity = contentMode == .aspectFit ? .resizeAspect : .resizeAspectFill
-            posterLayer.contentsGravity = gravity
-            frameLayer.contentsGravity = gravity
-            playerLayer.videoGravity = contentMode == .aspectFit ? .resizeAspect : .resizeAspectFill
+            applyContentGeometry()
         }
     }
 
@@ -164,6 +208,8 @@ final class WallpaperHostView: NSView {
             "bounds": NSNull(),
             "contents": NSNull(),
             "contentsGravity": NSNull(),
+            "frame": NSNull(),
+            "videoGravity": NSNull(),
             "hidden": NSNull(),
             "position": NSNull()
         ]

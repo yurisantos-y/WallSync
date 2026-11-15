@@ -198,25 +198,47 @@ final class NativeDesktopPictureManager {
         dimming: DimmingSettings = .off,
         isDarkAppearance: Bool = false
     ) -> [NativeDesktopPictureAssignment] {
-        reconciliationPolicy.desiredSessions(
+        let sessions = reconciliationPolicy.desiredSessions(
             displays: displays,
             assets: assets,
             placements: placements
-        ).compactMap { desiredSession in
+        )
+
+        // Displays sharing a spanning video each get their slice of the poster.
+        var spans: [UUID: [DesiredWallpaperSession]] = [:]
+        for session in sessions where session.placement.spansDisplays {
+            spans[session.asset.id, default: []].append(session)
+        }
+        var crops: [String: CGRect] = [:]
+        for members in spans.values where members.count >= 2 {
+            guard let first = members.first else { continue }
+            crops.merge(
+                PanoramaLayout.crops(
+                    displays: members.map { PanoramaLayout.Display(id: $0.display.displayUUID, frame: $0.display.frame) },
+                    videoSize: first.asset.optimizedPlayback?.pixelSize ?? first.asset.pixelSize,
+                    offset: first.placement.panoramaOffset
+                )
+            ) { current, _ in current }
+        }
+
+        return sessions.compactMap { desiredSession in
             guard let posterImageRelativePath = desiredSession.asset.posterImageRelativePath else {
                 return nil
             }
+            let crop = crops[desiredSession.display.displayUUID]
 
             return NativeDesktopPictureAssignment(
                 displayUUID: desiredSession.display.displayUUID,
                 cgDisplayID: desiredSession.display.cgDisplayID,
                 posterImageRelativePath: posterImageRelativePath,
-                contentMode: desiredSession.placement.contentMode,
+                // A slice already has the display's proportions.
+                contentMode: crop == nil ? desiredSession.placement.contentMode : .aspectFill,
                 dimming: DimmingPolicy.overlay(
                     for: desiredSession.asset,
                     settings: dimming,
                     isDarkAppearance: isDarkAppearance
-                )
+                ),
+                crop: crop
             )
         }
     }

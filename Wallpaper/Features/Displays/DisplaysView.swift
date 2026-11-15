@@ -66,6 +66,8 @@ struct DisplaysView: View {
             }
             .pickerStyle(.menu)
 
+            panoramaControls
+
             HStack(spacing: 10) {
                 WallpaperStatusPill(
                     label: coordinator.runtimeState.powerSource.localizedLabel,
@@ -87,6 +89,69 @@ struct DisplaysView: View {
                     )
                 }
             }
+        }
+    }
+}
+
+extension DisplaysView {
+    /// Displays that show the "all displays" wallpaper, i.e. the ones a
+    /// panorama would span.
+    private var spannedDisplays: [DisplayTarget] {
+        coordinator.runtimeState.activeDisplays.filter { !coordinator.hasDisplayOverride(for: $0) }
+    }
+
+    @ViewBuilder
+    fileprivate var panoramaControls: some View {
+        if let placement = coordinator.globalPlacement {
+            let displays = spannedDisplays
+            let asset = coordinator.assets.first { $0.id == placement.assetID }
+            let slack = PanoramaLayout.hasSlack(
+                displays: displays.map { PanoramaLayout.Display(id: $0.displayUUID, frame: $0.frame) },
+                videoSize: asset?.pixelSize ?? .zero
+            )
+
+            VStack(alignment: .leading, spacing: 10) {
+                Toggle(
+                    "Stretch one video across the displays",
+                    isOn: Binding(
+                        get: { placement.spansDisplays },
+                        set: { coordinator.updatePanorama(spansDisplays: $0) }
+                    )
+                )
+                .disabled(displays.count < 2 && !placement.spansDisplays)
+                .help(Text("Each display shows its own part of the same video, as if the screens were windows onto one picture. The video is still decoded only once."))
+
+                if placement.spansDisplays {
+                    if displays.count < 2 {
+                        Text("Needs at least two displays using the wallpaper for all displays.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        if slack.horizontal {
+                            panoramaSlider(title: String(localized: "Horizontal position"), placement: placement, horizontal: true)
+                        }
+                        if slack.vertical {
+                            panoramaSlider(title: String(localized: "Vertical position"), placement: placement, horizontal: false)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func panoramaSlider(title: String, placement: WallpaperPlacement, horizontal: Bool) -> some View {
+        let offset = placement.panoramaOffset
+        return HStack(spacing: 12) {
+            Text(title)
+                .frame(width: 150, alignment: .leading)
+            Slider(
+                value: Binding(
+                    get: { horizontal ? offset.x : offset.y },
+                    set: { coordinator.updatePanorama(offset: horizontal ? CGPoint(x: $0, y: offset.y) : CGPoint(x: offset.x, y: $0)) }
+                ),
+                in: -1...1
+            )
+            .accessibilityLabel(Text(title))
         }
     }
 }

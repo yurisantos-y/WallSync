@@ -34,6 +34,7 @@ final class WallpaperSessionManager {
         var posterPath: String?
         var isAttached = false
         var dimming: DimOverlay?
+        var crop: CGRect?
 
         init(session: RenderSession, asset: WallpaperAsset, placement: WallpaperPlacement, surface: any WallpaperSurface) {
             self.session = session
@@ -329,6 +330,8 @@ final class WallpaperSessionManager {
             }
         }
 
+        applyPanoramaGeometry()
+
         // 3. Refresh per-session environment from a single window snapshot.
         // When nobody can see the desktop the window list cannot change the
         // outcome, so it is not even queried.
@@ -507,6 +510,39 @@ final class WallpaperSessionManager {
         if member.session.windowState != windowState {
             member.session.windowState = windowState
             member.session.lastVisibilityChange = .now
+        }
+    }
+
+    /// One video across several displays: every display of a spanning
+    /// placement that shows the same asset gets its slice. Recomputed on
+    /// every reconcile, so connecting, removing or rearranging displays only
+    /// moves the slices; playback of the shared video is not restarted.
+    private func applyPanoramaGeometry() {
+        var spans: [String: [SessionRuntime]] = [:]
+        for runtime in sessions.values where runtime.placement.spansDisplays {
+            spans[groupKey(for: runtime), default: []].append(runtime)
+        }
+
+        var crops: [String: CGRect] = [:]
+        for members in spans.values where members.count >= 2 {
+            guard let first = members.first else { continue }
+            let videoSize = first.asset.optimizedPlayback?.pixelSize ?? first.asset.pixelSize
+            let layout = PanoramaLayout.crops(
+                displays: members.map {
+                    PanoramaLayout.Display(id: $0.session.displayTarget.displayUUID, frame: $0.session.displayTarget.frame)
+                },
+                videoSize: videoSize,
+                offset: first.placement.panoramaOffset
+            )
+            crops.merge(layout) { current, _ in current }
+        }
+
+        for (displayID, runtime) in sessions {
+            let crop = crops[displayID]
+            if runtime.crop != crop {
+                runtime.crop = crop
+                runtime.surface.setContentCrop(crop)
+            }
         }
     }
 

@@ -339,7 +339,7 @@ final class AppCoordinator {
         do {
             let rendition = try await importPipeline.optimize(
                 asset: asset,
-                maximumPixelSize: displayManager.currentDisplays().largestPixelSize,
+                maximumPixelSize: maximumPixelSize(for: assetID, displays: displayManager.currentDisplays()),
                 quality: preferences.playbackQuality,
                 progress: { [weak self] fraction in
                     Task { @MainActor in
@@ -486,7 +486,6 @@ final class AppCoordinator {
 
         let displays = runtimeState.activeDisplays
         guard !displays.isEmpty else { return }
-        let maximumPixelSize = displays.largestPixelSize
         let assetsInUse = Set(placements.filter(\.isEnabled).map(\.assetID))
             .union(resolution.displays.map(\.assetID))
             .union(playlists.flatMap(\.referencedAssetIDs))
@@ -496,7 +495,7 @@ final class AppCoordinator {
             && !reoptimizationAttempted.contains(asset.id)
             && OptimizationPlanner.needsReoptimization(
                 asset: asset,
-                maximumPixelSize: maximumPixelSize,
+                maximumPixelSize: self.maximumPixelSize(for: asset.id, displays: displays),
                 quality: preferences.playbackQuality
             ) {
             // One attempt per launch: an unreachable original is not retried
@@ -505,6 +504,40 @@ final class AppCoordinator {
             Log.importing.info("asset \(asset.id.uuidString, privacy: .public): a better rendition is possible, reoptimizing")
             enqueueOptimization(for: asset.id, kind: .reoptimization)
         }
+    }
+
+    /// Pixel size a rendition of the asset is produced for: the largest
+    /// display, or the whole span when the asset stretches across displays.
+    private func maximumPixelSize(for assetID: UUID, displays: [DisplayTarget]) -> CGSize {
+        let spanned = Set(
+            resolution.displays
+                .filter { $0.assetID == assetID && $0.placement.spansDisplays }
+                .map(\.displayUUID)
+        )
+        let spanDisplays = displays.filter { spanned.contains($0.displayUUID) }
+        guard spanDisplays.count >= 2 else { return displays.largestPixelSize }
+        return PanoramaLayout.targetPixelSize(displays: spanDisplays)
+    }
+
+    /// The saved wallpaper for every display, when there is one.
+    var globalPlacement: WallpaperPlacement? {
+        placements.first(where: \.isGlobal)
+    }
+
+    /// Turns the panorama on or off for the "all displays" wallpaper and
+    /// sets which part of the video stays visible.
+    func updatePanorama(spansDisplays: Bool? = nil, offset: CGPoint? = nil) {
+        guard let index = placements.firstIndex(where: \.isGlobal) else { return }
+        var placement = placements[index]
+        if let spansDisplays { placement.spansDisplays = spansDisplays }
+        if let offset {
+            placement.panoramaOffset = CGPoint(x: min(max(offset.x, -1), 1), y: min(max(offset.y, -1), 1))
+        }
+        guard placement != placements[index] else { return }
+        updatePlacements { $0[index] = placement }
+        // A span may call for a larger rendition than a single display did.
+        reoptimizationAttempted.removeAll()
+        persistPlacementsAndReconcile(reason: "panorama_changed")
     }
 
     /// Stores new edits for an asset. The current rendition keeps playing
