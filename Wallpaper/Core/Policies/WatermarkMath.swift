@@ -263,20 +263,41 @@ enum MotionSearch {
             return Shift(dx: 0, dy: 0, error: 1)
         }
 
+        // Which pixels belong to a mark, looked up instead of re-tested
+        // for every pixel of every candidate shift.
+        let width = a.width
+        var excluded = [Bool](repeating: false, count: a.pixels.count)
+        for rect in exclude {
+            let clipped = rect.clipped(width: a.width, height: a.height)
+            guard !clipped.isEmpty else { continue }
+            for y in clipped.y..<clipped.maxY {
+                for x in clipped.x..<clipped.maxX { excluded[y * width + x] = true }
+            }
+        }
+        let hasExclusions = !exclude.isEmpty
+
         func cost(_ dx: Int, _ dy: Int) -> Float {
             var total: Float = 0
             var count = 0
-            var y = radius
-            while y < a.height - radius {
-                var x = radius
-                while x < a.width - radius {
-                    if !exclude.contains(where: { $0.contains(x, y) || $0.contains(x + dx, y + dy) }) {
-                        total += abs(a[x, y] - b[x + dx, y + dy])
-                        count += 1
+            let shift = dy * width + dx
+            a.pixels.withUnsafeBufferPointer { first in
+                b.pixels.withUnsafeBufferPointer { second in
+                    excluded.withUnsafeBufferPointer { mask in
+                        var y = radius
+                        while y < a.height - radius {
+                            var index = y * width + radius
+                            let end = y * width + width - radius
+                            while index < end {
+                                if !hasExclusions || !(mask[index] || mask[index + shift]) {
+                                    total += abs(first[index] - second[index + shift])
+                                    count += 1
+                                }
+                                index += 2
+                            }
+                            y += 2
+                        }
                     }
-                    x += 2
                 }
-                y += 2
             }
             return count > 0 ? total / Float(count) : 1
         }

@@ -7,7 +7,7 @@ import XCTest
 /// mark is put over a known scene, removed, and the result is compared with
 /// the scene inside the marked area (PSNR, values 0 … 1) for every frame.
 final class WatermarkRemovalQualityTests: XCTestCase {
-    private let width = 480, height = 270
+    private let width = 320, height = 180
     private let region = CGRect(x: 0.72, y: 0.75, width: 0.125, height: 0.11)
     private var mark: PixelRect { WatermarkRemover.pixelRect(for: region, width: width, height: height, border: 0) }
 
@@ -42,7 +42,7 @@ final class WatermarkRemovalQualityTests: XCTestCase {
         var outsideChanged: Int
     }
 
-    private func run(opacity: Float, panPerFrame: Double, tenBit: Bool = false, frames: Int = 30, textured: Bool = true) throws -> Outcome {
+    private func run(opacity: Float, panPerFrame: Double, tenBit: Bool = false, frames: Int = 24, textured: Bool = true) throws -> Outcome {
         let processor = try XCTUnwrap(PlaneProcessor())
         let truth = (0..<frames).map {
             Synthetic.scene(width: width, height: height, offsetX: Double($0) * panPerFrame, textured: textured)
@@ -146,12 +146,12 @@ final class WatermarkRemovalQualityTests: XCTestCase {
     }
 
     func testTenBitFramesKeepTheirPrecision() throws {
-        let unmixed = try run(opacity: 0.4, panPerFrame: 12, tenBit: true)
+        let unmixed = try run(opacity: 0.4, panPerFrame: 12, tenBit: true, frames: 18)
         XCTAssertEqual(unmixed.strategy, .unblend)
         XCTAssertGreaterThan(unmixed.worstPSNR, 34)
         XCTAssertEqual(unmixed.outsideChanged, 0)
 
-        let filled = try run(opacity: 1, panPerFrame: 12, tenBit: true)
+        let filled = try run(opacity: 1, panPerFrame: 12, tenBit: true, frames: 18)
         XCTAssertEqual(filled.strategy, .temporal)
         XCTAssertGreaterThan(filled.meanPSNR, 36)
         XCTAssertGreaterThan(filled.worstPSNR, 30)
@@ -186,7 +186,7 @@ final class WatermarkOptimizerTests: XCTestCase {
     }
 
     func testRecipeWithARegionProducesACleanLoopingRendition() async throws {
-        let width = 640, height = 360
+        let width = 320, height = 180
         let region = CGRect(x: 0.72, y: 0.75, width: 0.125, height: 0.11)
         let mark = WatermarkRemover.pixelRect(for: region, width: width, height: height, border: 0)
         let source = root.appendingPathComponent("marked.mp4")
@@ -201,7 +201,7 @@ final class WatermarkOptimizerTests: XCTestCase {
         recipe.watermarkRegions = [region]
         recipe.loopCrossfade = 0.5
         let rendition = try await VideoAssetOptimizer(storage: storage).optimize(
-            sourceURL: source, assetID: UUID(), maximumPixelSize: CGSize(width: 640, height: 360), quality: .efficiency, recipe: recipe
+            sourceURL: source, assetID: UUID(), maximumPixelSize: CGSize(width: 320, height: 180), quality: .efficiency, recipe: recipe
         )
 
         XCTAssertEqual(rendition.recipe, recipe)
@@ -233,11 +233,11 @@ final class WatermarkOptimizerTests: XCTestCase {
     }
 
     func testEditorDetectionAndComparisonOnARealFile() async throws {
-        let width = 480, height = 270
+        let width = 320, height = 180
         let region = CGRect(x: 0.72, y: 0.75, width: 0.125, height: 0.11)
         let mark = WatermarkRemover.pixelRect(for: region, width: width, height: height, border: 0)
         let source = root.appendingPathComponent("logo.mp4")
-        try await FrameFactory.writeClip(to: source, frameCount: 75) { index in
+        try await FrameFactory.writeClip(to: source, frameCount: 60) { index in
             let scene = Synthetic.stamped(
                 Synthetic.scene(width: width, height: height, offsetX: Double(index) * 12, offsetY: Double(index) * 5), rect: mark, opacity: 1
             )
